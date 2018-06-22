@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.support.v7.app.AppCompatActivity
@@ -15,11 +16,7 @@ import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.support.v7.widget.LinearLayoutManager
 import android.util.DisplayMetrics
-import com.bumptech.glide.Glide
-import com.bumptech.glide.request.target.BitmapImageViewTarget
-import com.bumptech.glide.request.transition.Transition
 import com.example.nhatpham.camerafilter.databinding.ActivityMainBinding
-import org.wysaid.nativePort.CGENativeLibrary
 import kotlin.collections.ArrayList
 
 class MainActivity : AppCompatActivity() {
@@ -27,6 +24,8 @@ class MainActivity : AppCompatActivity() {
     lateinit var mBinding: ActivityMainBinding
     lateinit var previewImagesAdapter: PreviewImagesAdapter
     lateinit var selectedPhotoUri: String
+    private var mBitmap: Bitmap? = null
+    private var mCurrentConfig: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,18 +34,17 @@ class MainActivity : AppCompatActivity() {
             checkToRequestReadExternalPermission()
         }
 
+        mBinding.imageView.setSurfaceCreatedCallback {
+            mBinding.imageView.setImageBitmap(mBitmap)
+            mBinding.imageView.setFilterWithConfig(mCurrentConfig)
+        }
+
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         previewImagesAdapter = PreviewImagesAdapter(EFFECT_CONFIGS.asList(), object : PreviewImagesAdapter.OnItemInteractListener {
             override fun onConfigSelected(selectedConfig: String) {
-                Glide.with(this@MainActivity).clear(mBinding.imageView)
-                Glide.with(this@MainActivity)
-                        .asBitmap()
-                        .load(selectedPhotoUri)
-                        .into(object : BitmapImageViewTarget(mBinding.imageView) {
-                            override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-                                getView().setImageBitmap(CGENativeLibrary.filterImage_MultipleEffects(resource, selectedConfig, 1.0f))
-                            }
-                        })
+                mBinding.imageView.post {
+                    mBinding.imageView.setFilterWithConfig(selectedConfig)
+                }
             }
         })
         mBinding.rcImgPreview.adapter = previewImagesAdapter
@@ -66,15 +64,49 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    public override fun onPause() {
+        super.onPause()
+        mBinding.imageView.release()
+        mBinding.imageView.onPause()
+    }
+
+    public override fun onResume() {
+        super.onResume()
+        mBinding.imageView.onResume()
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == OPEN_GALLERY_REQUEST_CODE) {
             if (resultCode == Activity.RESULT_OK) {
                 data?.data?.let { photoUri ->
                     requestPersistablePermission(this, data, photoUri)
-                    mBinding.imageView.setImageURI(photoUri)
                     selectedPhotoUri = photoUri.toString()
-                    previewImagesAdapter.imageUri = photoUri.toString()
+                    previewImagesAdapter.imageUri = selectedPhotoUri
                     previewImagesAdapter.notifyDataSetChanged()
+
+                    try {
+
+                        val stream = contentResolver.openInputStream(photoUri)
+                        val bmp = BitmapFactory.decodeStream(stream)
+
+                        var w = bmp.width
+                        var h = bmp.height
+                        val s = Math.max(w / 2048.0f, h / 2048.0f)
+
+                        if (s > 1.0f) {
+                            w /= s.toInt()
+                            h /= s.toInt()
+                            mBitmap = Bitmap.createScaledBitmap(bmp, w, h, false)
+                        } else {
+                            mBitmap = bmp
+                        }
+
+                        mBinding.imageView.setImageBitmap(mBitmap)
+
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+
                 }
             }
         } else {

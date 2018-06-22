@@ -14,13 +14,11 @@
             android:layout_height="wrap_content"
             android:text="Button" />
 
-        <ImageView
+        <org.wysaid.view.ImageGLSurfaceView
             android:id="@+id/imageView"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
-            android:scaleType="centerInside"
-            tools:srcCompat="@tools:sample/avatars[10]" />
+            android:layout_weight="1" />
 
         <android.support.v7.widget.RecyclerView
             android:id="@+id/rcImgPreview"
