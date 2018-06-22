@@ -178,6 +178,12 @@ class MainActivity : AppCompatActivity() {
             "@blur lerp 1", //can adjust blur mix
             "#unpack @dynamic wave 1", //can adjust speed
             "@dynamic wave 0.5", //can adjust wave mix
+            "@adjust lut edgy_amber.png",
+            "@adjust lut filmstock.png",
+            "@adjust lut foggy_night.png",
+            "@adjust lut late_sunset.png",
+            "@adjust lut soft_warming.png",
+            "@adjust lut wildbird.png",
             "#unpack @style sketch 0.9",
             "@beautify bilateral 100 3.5 2 ", "@style crosshatch 0.01 0.003 ", "@style edge 1 2 ", "@style edge 1 2 @curve RGB(0, 255)(255, 0) ", "@style edge 1 2 @curve RGB(0, 255)(255, 0) @adjust saturation 0 @adjust level 0.33 0.71 0.93 ", "@adjust level 0.31 0.54 0.13 ", "#unpack @style emboss 1 2 2 ", "@style halftone 1.2 ", "@vigblend overlay 255 0 0 255 100 0.12 0.54 0.5 0.5 3 ", "@curve R(0, 0)(63, 101)(200, 84)(255, 255)G(0, 0)(86, 49)(180, 183)(255, 255)B(0, 0)(19, 17)(66, 41)(97, 92)(137, 156)(194, 211)(255, 255)RGB(0, 0)(82, 36)(160, 183)(255, 255) ", "@adjust exposure 0.98 ", "@adjust shadowhighlight -200 200 ", "@adjust sharpen 10 1.5 ", "@adjust colorbalance 0.99 0.52 -0.31 ", "@adjust level 0.66 0.23 0.44 ", "@style min", "@style max", "@style haze 0.5 -0.14 1 0.8 1 ", "@curve R(0, 0)(71, 74)(164, 165)(255, 255) @pixblend screen 0.94118 0.29 0.29 1 20", //415
             "@curve G(0, 0)(144, 166)(255, 255) @pixblend screen 0.94118 0.29 0.29 1 20", //416

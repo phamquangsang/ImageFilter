@@ -3,6 +3,7 @@ package com.example.nhatpham.camerafilter
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
 import android.support.v7.widget.RecyclerView
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -42,9 +43,10 @@ class PreviewImagesAdapter(private val configs: List<String> = ArrayList(),
         val mBinding: LayoutPreviewItemBinding? = DataBindingUtil.bind(itemView)
 
         init {
-            itemView.setOnClickListener({
+            itemView.setOnClickListener {
                 onItemInteractListener?.onConfigSelected(configs[adapterPosition])
-            })
+                Log.i("PreviewImagesAdapter" ,"Configuration selected : "+ configs[adapterPosition])
+            }
         }
 
         fun bindData(config: String) {
