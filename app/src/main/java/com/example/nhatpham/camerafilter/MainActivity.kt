@@ -1,4 +1,4 @@
-package com.example.nhatpham.filterexample
+package com.example.nhatpham.camerafilter
 
 import android.Manifest
 import android.app.Activity
@@ -18,7 +18,6 @@ import android.util.DisplayMetrics
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.target.BitmapImageViewTarget
 import com.bumptech.glide.request.transition.Transition
-import com.example.nhatpham.camerafilter.R
 import com.example.nhatpham.camerafilter.databinding.ActivityMainBinding
 import org.wysaid.nativePort.CGENativeLibrary
 import kotlin.collections.ArrayList

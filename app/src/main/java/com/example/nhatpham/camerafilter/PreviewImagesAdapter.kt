@@ -1,4 +1,4 @@
-package com.example.nhatpham.filterexample
+package com.example.nhatpham.camerafilter
 
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
@@ -10,8 +10,8 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool
 import com.bumptech.glide.load.resource.bitmap.BitmapTransformation
 import com.bumptech.glide.request.RequestOptions
+import com.example.nhatpham.camerafilter.databinding.LayoutPreviewItemBinding
 
-import com.example.nhatpham.filterexample.databinding.LayoutPreviewItemBinding
 import org.wysaid.nativePort.CGENativeLibrary
 import java.security.MessageDigest
 
