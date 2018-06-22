@@ -2,9 +2,11 @@ package com.example.nhatpham.camerafilter
 
 import android.Manifest
 import android.app.Activity
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.database.Cursor
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -12,11 +14,22 @@ import android.net.Uri
 import android.os.Build
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
+import android.os.Environment
+import android.provider.DocumentsContract
+import android.provider.MediaStore
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.support.v7.widget.LinearLayoutManager
 import android.util.DisplayMetrics
+import android.util.Log
 import com.example.nhatpham.camerafilter.databinding.ActivityMainBinding
+import org.wysaid.common.Common
+import org.wysaid.myUtils.FileUtil
+import org.wysaid.nativePort.CGEFFmpegNativeLibrary
+import org.wysaid.nativePort.CGENativeLibrary
+import org.wysaid.view.ImageGLSurfaceView
+import java.io.IOException
+import java.io.InputStream
 import kotlin.collections.ArrayList
 
 class MainActivity : AppCompatActivity() {
@@ -34,6 +47,7 @@ class MainActivity : AppCompatActivity() {
             checkToRequestReadExternalPermission()
         }
 
+        mBinding.imageView.displayMode = ImageGLSurfaceView.DisplayMode.DISPLAY_ASPECT_FIT
         mBinding.imageView.setSurfaceCreatedCallback {
             mBinding.imageView.setImageBitmap(mBitmap)
             mBinding.imageView.setFilterWithConfig(mCurrentConfig)
@@ -43,11 +57,33 @@ class MainActivity : AppCompatActivity() {
         previewImagesAdapter = PreviewImagesAdapter(EFFECT_CONFIGS.asList(), object : PreviewImagesAdapter.OnItemInteractListener {
             override fun onConfigSelected(selectedConfig: String) {
                 mBinding.imageView.post {
+                    mCurrentConfig = selectedConfig
                     mBinding.imageView.setFilterWithConfig(selectedConfig)
                 }
             }
         })
         mBinding.rcImgPreview.adapter = previewImagesAdapter
+
+        CGENativeLibrary.setLoadImageCallback(object : CGENativeLibrary.LoadImageCallback {
+
+            override fun loadImage(name: String, arg: Any?): Bitmap? {
+                Log.i(Common.LOG_TAG, "Loading file: $name")
+                val am = assets
+                val inputStream: InputStream
+                try {
+                    inputStream = am.open(name)
+                } catch (e: IOException) {
+                    Log.e(Common.LOG_TAG, "Can not open file $name")
+                    return null
+                }
+                return BitmapFactory.decodeStream(inputStream)
+            }
+
+            override fun loadImageOK(bmp: Bitmap, arg: Any?) {
+                Log.i(Common.LOG_TAG, "Loading bitmap over, you can choose to recycle or cache")
+                bmp.recycle()
+            }
+        }, null)
     }
 
     private fun checkToRequestReadExternalPermission() {
@@ -81,32 +117,39 @@ class MainActivity : AppCompatActivity() {
                 data?.data?.let { photoUri ->
                     requestPersistablePermission(this, data, photoUri)
                     selectedPhotoUri = photoUri.toString()
-                    previewImagesAdapter.imageUri = selectedPhotoUri
-                    previewImagesAdapter.notifyDataSetChanged()
+//                    previewImagesAdapter.imageUri = selectedPhotoUri
+//                    previewImagesAdapter.notifyDataSetChanged()
+//
+//                    try {
+//
+//                        val stream = contentResolver.openInputStream(photoUri)
+//                        val bmp = BitmapFactory.decodeStream(stream)
+//
+//                        var w = bmp.width
+//                        var h = bmp.height
+//                        val s = Math.max(w / 2048.0f, h / 2048.0f)
+//
+//                        if (s > 1.0f) {
+//                            w /= s.toInt()
+//                            h /= s.toInt()
+//                            mBitmap = Bitmap.createScaledBitmap(bmp, w, h, false)
+//                        } else {
+//                            mBitmap = bmp
+//                        }
+//
+//                        mBinding.imageView.setImageBitmap(mBitmap)
+//
+//                    } catch (e: Exception) {
+//                        e.printStackTrace()
+//                    }
+                    Thread {
+                        val outputFilename = FileUtil.getPath() + "/outputVideo.mp4"
+                        val inputFileName = getPath(this, photoUri) ?: return@Thread
+                        CGEFFmpegNativeLibrary.generateVideoWithFilter(outputFilename, inputFileName, "@adjust lut late_sunset.png", 1.0f, null, CGENativeLibrary.TextureBlendMode.CGE_BLEND_ADDREV, 1.0f, false);
 
-                    try {
-
-                        val stream = contentResolver.openInputStream(photoUri)
-                        val bmp = BitmapFactory.decodeStream(stream)
-
-                        var w = bmp.width
-                        var h = bmp.height
-                        val s = Math.max(w / 2048.0f, h / 2048.0f)
-
-                        if (s > 1.0f) {
-                            w /= s.toInt()
-                            h /= s.toInt()
-                            mBitmap = Bitmap.createScaledBitmap(bmp, w, h, false)
-                        } else {
-                            mBitmap = bmp
-                        }
-
-                        mBinding.imageView.setImageBitmap(mBitmap)
-
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-
+                        Log.d("WTF", "done save")
+                        sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.parse("file://$outputFilename")))
+                    }.start()
                 }
             }
         } else {
@@ -132,14 +175,14 @@ class MainActivity : AppCompatActivity() {
     private fun openPhotoGallery(activity: Activity, allowMultiPick: Boolean, requestCode: Int) {
         if (Build.VERSION.SDK_INT < 19) {
             val intent = Intent()
-            intent.type = "image/*"
+            intent.type = "video/*"
             intent.action = Intent.ACTION_GET_CONTENT
             activity.startActivityForResult(intent, requestCode)
         } else {
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
             intent.addCategory(Intent.CATEGORY_OPENABLE)
             intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, allowMultiPick)
-            intent.type = "image/*"
+            intent.type = "video/*"
             activity.startActivityForResult(intent, requestCode)
         }
     }
@@ -254,4 +297,120 @@ class MainActivity : AppCompatActivity() {
             "@adjust saturation 0 @curve R(0, 68)(10, 72)(42, 135)(72, 177)(98, 201)(220, 255)G(0, 29)(12, 30)(57, 127)(119, 203)(212, 255)(254, 239)B(0, 36)(54, 118)(66, 141)(119, 197)(155, 215)(255, 254)", //304
             "@curve R(0, 64)(16, 13)(58, 128)(108, 109)(162, 223)(255, 255)G(0, 30)(22, 35)(42, 58)(56, 86)(70, 119)(130, 184)(189, 212)B(6, 36)(76, 157)(107, 192)(173, 229)(255, 255)", //306
             "@vigblend mix 10 10 30 255 91 0 1.0 0.5 0.5 3 @curve R(0, 31)(35, 75)(81, 139)(109, 174)(148, 207)(255, 255)G(0, 24)(59, 88)(105, 146)(130, 171)(145, 187)(180, 214)(255, 255)B(0, 96)(63, 130)(103, 157)(169, 194)(255, 255)", "@adjust saturation 0 @curve R(0, 49)(16, 44)(34, 56)(74, 120)(120, 185)(151, 223)(255, 255)G(0, 46)(34, 73)(85, 129)(111, 164)(138, 192)(170, 215)(255, 255)B(0, 77)(51, 101)(105, 143)(165, 182)(210, 213)(250, 229)", "@adjust saturation 0 @adjust level 0 0.83921 0.8772", "@adjust hsl 0.02 -0.31 -0.17 @curve R(0, 28)(23, 45)(117, 148)(135, 162)G(0, 8)(131, 152)(255, 255)B(0, 17)(58, 80)(132, 131)(127, 131)(255, 225)")
+
+    fun getPath(context: Context, uri: Uri): String? {
+        // DocumentProvider
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT && DocumentsContract.isDocumentUri(context, uri)) {
+            // ExternalStorageProvider
+            if (isExternalStorageDocument(uri)) {
+                val docId = DocumentsContract.getDocumentId(uri)
+                val split = docId.split(":".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+                val type = split[0]
+
+                if ("primary".equals(type, ignoreCase = true)) {
+                    return Environment.getExternalStorageDirectory().toString() + "/" + split[1]
+                }
+
+                // TODO handle non-primary volumes
+            } else if (isDownloadsDocument(uri)) {
+
+                val id = DocumentsContract.getDocumentId(uri)
+                val contentUri = ContentUris.withAppendedId(
+                        Uri.parse("content://downloads/public_downloads"), java.lang.Long.valueOf(id))
+
+                return getDataColumn(context, contentUri, null, null)
+            } else if (isMediaDocument(uri)) {
+                val docId = DocumentsContract.getDocumentId(uri)
+                val split = docId.split(":".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+                val type = split[0]
+
+                var contentUri: Uri? = null
+                if ("image" == type) {
+                    contentUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                } else if ("video" == type) {
+                    contentUri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                } else if ("audio" == type) {
+                    contentUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                }
+
+                val selection = "_id=?"
+                val selectionArgs = arrayOf(split[1])
+
+                return getDataColumn(context, contentUri, selection, selectionArgs)
+            }// MediaProvider
+            // DownloadsProvider
+        } else if ("content".equals(uri.scheme!!, ignoreCase = true)) {
+
+            // Return the remote address
+            return if (isGooglePhotosUri(uri)) uri.lastPathSegment else getDataColumn(context, uri, null, null)
+
+        } else if ("file".equals(uri.scheme!!, ignoreCase = true)) {
+            return uri.path
+        }// File
+        // MediaStore (and general)
+
+        return null
+    }
+
+    /**
+     * Get the value of the data column for this Uri. This is useful for
+     * MediaStore Uris, and other file-based ContentProviders.
+     *
+     * @param context       The context.
+     * @param uri           The Uri to query.
+     * @param selection     (Optional) Filter used in the query.
+     * @param selectionArgs (Optional) Selection arguments used in the query.
+     * @return The value of the _data column, which is typically a file path.
+     */
+    fun getDataColumn(context: Context, uri: Uri?, selection: String?,
+                      selectionArgs: Array<String>?): String? {
+
+        var cursor: Cursor? = null
+        val projection = arrayOf(MediaStore.Images.Media.DATA)
+
+        try {
+            cursor = context.contentResolver.query(uri!!, projection, selection, selectionArgs, null)
+            if (cursor != null && cursor.moveToFirst()) {
+                val index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
+                return cursor.getString(index)
+            }
+        } finally {
+            if (cursor != null)
+                cursor.close()
+        }
+        return null
+    }
+
+
+    /**
+     * @param uri The Uri to check.
+     * @return Whether the Uri authority is ExternalStorageProvider.
+     */
+    fun isExternalStorageDocument(uri: Uri): Boolean {
+        return "com.android.externalstorage.documents" == uri.authority
+    }
+
+    /**
+     * @param uri The Uri to check.
+     * @return Whether the Uri authority is DownloadsProvider.
+     */
+    fun isDownloadsDocument(uri: Uri): Boolean {
+        return "com.android.providers.downloads.documents" == uri.authority
+    }
+
+    /**
+     * @param uri The Uri to check.
+     * @return Whether the Uri authority is MediaProvider.
+     */
+    fun isMediaDocument(uri: Uri): Boolean {
+        return "com.android.providers.media.documents" == uri.authority
+    }
+
+    /**
+     * @param uri The Uri to check.
+     * @return Whether the Uri authority is Google Photos.
+     */
+    fun isGooglePhotosUri(uri: Uri): Boolean {
+        return "com.google.android.apps.photos.content" == uri.authority
+    }
 }
