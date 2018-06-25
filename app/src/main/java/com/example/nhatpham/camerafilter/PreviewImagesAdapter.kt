@@ -45,7 +45,6 @@ class PreviewImagesAdapter(private val configs: List<String> = ArrayList(),
         init {
             itemView.setOnClickListener {
                 onItemInteractListener?.onConfigSelected(configs[adapterPosition])
-                Log.i("PreviewImagesAdapter" ,"Configuration selected : "+ configs[adapterPosition])
             }
         }
 
