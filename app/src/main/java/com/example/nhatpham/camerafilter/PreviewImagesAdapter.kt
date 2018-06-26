@@ -36,7 +36,7 @@ class PreviewImagesAdapter(private val configs: List<String> = ArrayList(),
         Glide.with(holder.itemView.context).clear(holder.mBinding!!.imgFilter)
     }
 
-    override fun getItemCount() = if (imageUri.isNullOrEmpty()) 0 else configs.size
+    override fun getItemCount() = configs.size
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
 
@@ -49,19 +49,37 @@ class PreviewImagesAdapter(private val configs: List<String> = ArrayList(),
         }
 
         fun bindData(config: String) {
-            Glide.with(itemView.context)
-                    .load(imageUri)
-                    .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
+            if(!imageUri.isNullOrEmpty()) {
+                Glide.with(itemView.context)
+                        .load(imageUri)
+                        .apply(RequestOptions.centerInsideTransform())
+                        .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
 
-                        override fun updateDiskCacheKey(messageDigest: MessageDigest) {
-                            messageDigest.update(config.toByteArray())
-                        }
+                            override fun updateDiskCacheKey(messageDigest: MessageDigest) {
+                                messageDigest.update(config.toByteArray())
+                            }
 
-                        override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int) =
-                                CGENativeLibrary.filterImage_MultipleEffects(toTransform, config, 1.0f)
+                            override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int) =
+                                    CGENativeLibrary.filterImage_MultipleEffects(toTransform, config, 1.0f)
 
-                    }))
-                    .into(mBinding!!.imgFilter)
+                        }))
+                        .into(mBinding!!.imgFilter)
+            } else {
+                Glide.with(itemView.context)
+                        .load(R.drawable.default_filter)
+                        .apply(RequestOptions.centerInsideTransform())
+                        .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
+
+                            override fun updateDiskCacheKey(messageDigest: MessageDigest) {
+                                messageDigest.update(config.toByteArray())
+                            }
+
+                            override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int) =
+                                    CGENativeLibrary.filterImage_MultipleEffects(toTransform, config, 1.0f)
+
+                        }))
+                        .into(mBinding!!.imgFilter)
+            }
         }
     }
 
