@@ -1,5 +1,8 @@
 package com.example.nhatpham.camerafilter
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ObjectAnimator
 import android.arch.lifecycle.ViewModelProviders
 import android.content.Intent
 import android.databinding.DataBindingUtil
@@ -12,6 +15,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AccelerateDecelerateInterpolator
 import androidx.core.view.isVisible
 import com.example.nhatpham.camerafilter.databinding.FragmentCameraBinding
 import kotlinx.android.synthetic.main.fragment_camera.*
@@ -63,7 +67,31 @@ class CameraFragment : Fragment() {
         }
 
         mBinding.btnPickFilters.setOnClickListener {
-            mBinding.rcImgPreview.isVisible = !mBinding.rcImgPreview.isVisible
+            if (!mBinding.rcImgPreview.isVisible) {
+                mBinding.rcImgPreview.animate()
+                        .alpha(1F)
+                        .setDuration(resources.getInteger(android.R.integer.config_shortAnimTime).toLong())
+                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .setListener(object : AnimatorListenerAdapter() {
+                            override fun onAnimationStart(animation: Animator?) {
+                                mBinding.rcImgPreview.animate().setListener(null)
+                                mBinding.rcImgPreview.alpha = 0.6F
+                                mBinding.rcImgPreview.isVisible = true
+                            }
+                        })
+                        .start()
+            } else {
+                mBinding.rcImgPreview.animate()
+                        .alpha(0F)
+                        .setDuration(resources.getInteger(android.R.integer.config_shortAnimTime).toLong())
+                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .setListener(object : AnimatorListenerAdapter() {
+                            override fun onAnimationEnd(animation: Animator?) {
+                                mBinding.rcImgPreview.animate().setListener(null)
+                                mBinding.rcImgPreview.isVisible = false
+                            }
+                        }).start()
+            }
         }
 
         mBinding.cameraView.apply {
