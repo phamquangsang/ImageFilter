@@ -45,6 +45,7 @@ class PhotoPreviewFragment : Fragment() {
             mBinding.imageView.setFilterWithConfig(currentConfig)
         }
 
+        imageConfigsFragment.cancelable = false
         imageConfigsFragment.configChangeListener = object : ImageConfigsFragment.ConfigChangeListener {
             override fun onFilterChanged(config: String) {
                 mBinding.imageView.post {
@@ -66,12 +67,9 @@ class PhotoPreviewFragment : Fragment() {
             }
         }
 
-        Handler().postDelayed({
-            childFragmentManager.beginTransaction()
-                    .setCustomAnimations(R.anim.translation_up, R.anim.translation_down)
-                    .add(R.id.layoutControl, imageConfigsFragment)
-                    .commit()
-        }, 1000)
+        childFragmentManager.beginTransaction()
+                .add(R.id.layoutControl, imageConfigsFragment)
+                .commit()
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {

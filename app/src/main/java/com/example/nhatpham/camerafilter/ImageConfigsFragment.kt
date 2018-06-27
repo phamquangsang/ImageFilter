@@ -19,6 +19,7 @@ class ImageConfigsFragment : Fragment() {
     }
 
     var configChangeListener : ConfigChangeListener? = null
+    var cancelable : Boolean = true
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_image_config, container, false)
@@ -35,8 +36,14 @@ class ImageConfigsFragment : Fragment() {
             mBinding.rcConfigs.visibility = View.GONE
             mBinding.rcImgPreview.visibility = View.VISIBLE
         }
-        mBinding.imgClose.setOnClickListener {
-            configChangeListener?.onClosed()
+
+        if(cancelable) {
+            mBinding.imgClose.visibility = View.VISIBLE
+            mBinding.imgClose.setOnClickListener {
+                configChangeListener?.onClosed()
+            }
+        } else {
+            mBinding.imgClose.visibility = View.GONE
         }
 
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
