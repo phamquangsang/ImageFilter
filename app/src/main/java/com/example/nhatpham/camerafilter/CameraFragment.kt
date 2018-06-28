@@ -73,7 +73,6 @@ class CameraFragment : Fragment() {
                 }, null, currentConfig, 1.0f, true)
             }
         }
-
         mBinding.btnTakePhoto.setOnLongClickListener(RecordListener())
 
         mBinding.btnPickFilters.setOnClickListener {
@@ -102,6 +101,13 @@ class CameraFragment : Fragment() {
                             }
                         }).start()
             }
+        }
+        mBinding.btnGallery.setOnClickListener {
+
+        }
+
+        mBinding.btnSwitch.setOnClickListener {
+            mBinding.cameraView.switchCamera()
         }
 
         mBinding.cameraView.apply {
