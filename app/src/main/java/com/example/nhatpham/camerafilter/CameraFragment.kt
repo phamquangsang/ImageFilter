@@ -16,11 +16,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
+import android.widget.Button
+import android.widget.Toast
 import androidx.core.view.isVisible
 import com.example.nhatpham.camerafilter.databinding.FragmentCameraBinding
 import kotlinx.android.synthetic.main.fragment_camera.*
 import org.wysaid.camera.CameraInstance
+import org.wysaid.myUtils.FileUtil
 import org.wysaid.myUtils.ImageUtil
+import org.wysaid.view.CameraRecordGLSurfaceView
 import java.io.File
 
 class CameraFragment : Fragment() {
@@ -30,6 +34,8 @@ class CameraFragment : Fragment() {
 
     private lateinit var previewImagesAdapter: PreviewImagesAdapter
     private var currentConfig: String? = null
+    private val mainHandler = Handler()
+    private var isRecording = false
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_camera, container, false)
@@ -51,20 +57,24 @@ class CameraFragment : Fragment() {
         mBinding.rcImgPreview.adapter = previewImagesAdapter
 
         mBinding.btnTakePhoto.setOnClickListener {
-            mBinding.cameraView.takePicture({ bitmap ->
-                if (bitmap != null) {
-                    val filePath = ImageUtil.saveBitmap(bitmap)
-                    bitmap.recycle()
-                    activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(filePath))))
+            if(!isRecording) {
+                mBinding.cameraView.takePicture({ bitmap ->
+                    if (bitmap != null) {
+                        val filePath = ImageUtil.saveBitmap(bitmap)
+                        bitmap.recycle()
+                        activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(filePath))))
 
-                    viewModel.openPreviewEvent.value = filePath
+                        viewModel.openPreviewEvent.value = filePath
 
-                    Log.d("WTF", "Take Pic success!")
-                } else {
-                    Log.d("WTF", "Take Pic failed!")
-                }
-            }, null, currentConfig, 1.0f, true)
+                        Log.d("WTF", "Take Pic success!")
+                    } else {
+                        Log.d("WTF", "Take Pic failed!")
+                    }
+                }, null, currentConfig, 1.0f, true)
+            }
         }
+
+        mBinding.btnTakePhoto.setOnLongClickListener(RecordListener())
 
         mBinding.btnPickFilters.setOnClickListener {
             if (!mBinding.rcImgPreview.isVisible) {
@@ -103,6 +113,7 @@ class CameraFragment : Fragment() {
 
     override fun onPause() {
         super.onPause()
+        CameraInstance.getInstance().stopCamera()
         mBinding.cameraView.release(null)
         mBinding.cameraView.onPause()
     }
@@ -110,5 +121,52 @@ class CameraFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         mBinding.cameraView.onResume()
+    }
+
+    inner class RecordListener : View.OnLongClickListener {
+
+        private var isValid = true
+        private var recordFilename: String = ""
+
+        override fun onLongClick(v: View?): Boolean {
+            val btn = v as Button
+
+            val LOG_TAG = CameraRecordGLSurfaceView.LOG_TAG;
+
+            if (!isValid) {
+                Log.e(LOG_TAG, "Please wait for the call...")
+                return false
+            }
+
+            isValid = false
+
+            if (!mBinding.cameraView.isRecording) {
+                btn.text = "Recording"
+                Log.i(LOG_TAG, "Start recording...")
+                recordFilename = ImageUtil.getPath() + "/rec_" + System.currentTimeMillis() + ".mp4"
+                //                recordFilename = ImageUtil.getPath(CameraDemoActivity.this, false) + "/rec_1.mp4";
+                mBinding.cameraView.startRecording(recordFilename, { success ->
+                    if (success) {
+                        mainHandler.post { Toast.makeText(this@CameraFragment.context, "Start recording OK", Toast.LENGTH_SHORT).show() }
+                        FileUtil.saveTextContent(recordFilename, FileUtil.getPath() + "/lastVideoPath.txt")
+                    } else {
+                        mainHandler.post { Toast.makeText(this@CameraFragment.context, "Start recording failed", Toast.LENGTH_SHORT).show() }
+                    }
+                    isValid = true
+                    isRecording = true
+                })
+            } else {
+                mainHandler.post { Toast.makeText(this@CameraFragment.context, "Recorded as: $recordFilename", Toast.LENGTH_SHORT).show() }
+
+                btn.text = "Take Picture"
+                Log.i(LOG_TAG, "End recording...")
+                mBinding.cameraView.endRecording {
+                    Log.i(LOG_TAG, "End recording OK")
+                    isValid = true
+                    isRecording = false
+                }
+            }
+            return true
+        }
     }
 }

@@ -44,28 +44,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         mBinding = DataBindingUtil.setContentView(this, R.layout.activity_main)
 
-        checkToRequestReadExternalPermission()
-
-        CGENativeLibrary.setLoadImageCallback(object : CGENativeLibrary.LoadImageCallback {
-
-            override fun loadImage(name: String, arg: Any?): Bitmap? {
-                Log.i(Common.LOG_TAG, "Loading file: $name")
-                val am = assets
-                val inputStream: InputStream
-                try {
-                    inputStream = am.open(name)
-                } catch (e: IOException) {
-                    Log.e(Common.LOG_TAG, "Can not open file $name")
-                    return null
-                }
-                return BitmapFactory.decodeStream(inputStream)
-            }
-
-            override fun loadImageOK(bmp: Bitmap, arg: Any?) {
-                Log.i(Common.LOG_TAG, "Loading bitmap over, you can choose to recycle or cache")
-                bmp.recycle()
-            }
-        }, null)
         startActivity(PreviewActivity.newIntent(this, "", false))
         finish()
     }
@@ -179,8 +157,21 @@ class MainActivity : AppCompatActivity() {
 
         val EFFECT_CONFIGS = arrayOf("", // ASCII art (字符画效果)
                 "@beautify face 1 480 640", //Beautify
-                "#unpack @blur lerp 0.75", //can adjust blur intensity
-                "@dynamic wave 0.5", //can adjust wave mix
+                "@adjust lut A.jpg",
+                "@adjust lut A-2.jpg",
+                "@adjust lut A-3.jpg",
+                "@adjust lut A-4.jpg",
+                "@adjust lut A-5.jpg",
+                "@adjust lut A-6.jpg",
+                "@adjust lut A-7.jpg",
+                "@adjust lut A-8.jpg",
+                "@adjust lut A-9.jpg",
+                "@adjust lut A-10.jpg",
+                "@adjust lut A-11.jpg",
+                "@adjust lut A-12.jpg",
+                "@adjust lut A-13.jpg",
+                "@adjust lut A-14.jpg",
+                "@adjust lut A-15.jpg",
                 "@adjust lut lookup_amatorka.png",
                 "@adjust lut lookup_fgfacolor.png",
                 "@adjust lut lookup_lofi.png",
@@ -193,10 +184,8 @@ class MainActivity : AppCompatActivity() {
                 "@adjust lut filmstock.png",
                 "@adjust lut foggy_night.png",
                 "@adjust lut soft_warming.png",
-                "#unpack @style sketch 0.9",
-                "@style halftone 1.2 ",
-                "@adjust shadowhighlight -200 200 ",
-                "@adjust sharpen 10 1.5 ",
+                "#unpack @blur lerp 0.75", //can adjust blur intensity
+                "@dynamic wave 0.5",
                 "@curve R(0, 0)(149, 145)(255, 255)G(0, 0)(149, 145)(255, 255)B(0, 0)(149, 145)(255, 255) @pixblend colordodge 0.937 0.482 0.835 1 20", //421
                 "@adjust saturation 0.7 @pixblend screen 1 0.243 0.69 1 30", //426
 
