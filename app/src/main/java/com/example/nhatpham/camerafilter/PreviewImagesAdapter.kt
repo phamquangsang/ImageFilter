@@ -2,6 +2,7 @@ package com.example.nhatpham.camerafilter
 
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
+import android.os.Bundle
 import android.support.v4.graphics.drawable.RoundedBitmapDrawable
 import android.support.v4.graphics.drawable.RoundedBitmapDrawableFactory
 import android.support.v7.widget.RecyclerView
@@ -9,6 +10,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.os.bundleOf
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool
@@ -20,13 +22,13 @@ import com.example.nhatpham.camerafilter.databinding.LayoutPreviewItemBinding
 
 import org.wysaid.nativePort.CGENativeLibrary
 import java.security.MessageDigest
-import java.util.concurrent.CountDownLatch
 
 class PreviewImagesAdapter(private val configs: List<String> = ArrayList(),
                            private val onItemInteractListener: PreviewImagesAdapter.OnItemInteractListener?)
     : RecyclerView.Adapter<PreviewImagesAdapter.ViewHolder>() {
 
     var imageUri: String? = null
+    var selectedPos: Int = 0
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PreviewImagesAdapter.ViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.layout_preview_item, parent, false)
@@ -50,12 +52,16 @@ class PreviewImagesAdapter(private val configs: List<String> = ArrayList(),
 
         init {
             itemView.setOnClickListener {
-                onItemInteractListener?.onConfigSelected(configs[adapterPosition])
+                val bundle = bundleOf("selected" to true)
+                notifyItemChanged(selectedPos)
+                selectedPos = adapterPosition
+                notifyItemChanged(selectedPos)
+                onItemInteractListener?.onConfigSelected(configs[selectedPos])
             }
         }
 
         fun bindData(config: String) {
-            if(!imageUri.isNullOrEmpty()) {
+            if (!imageUri.isNullOrEmpty()) {
                 Glide.with(itemView.context)
                         .asBitmap()
                         .load(imageUri)
@@ -63,21 +69,14 @@ class PreviewImagesAdapter(private val configs: List<String> = ArrayList(),
                         .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
 
                             override fun updateDiskCacheKey(messageDigest: MessageDigest) {
-                                messageDigest.update(config.toByteArray())
+                                messageDigest.update("$imageUri-$config".toByteArray())
                             }
 
                             override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int) =
                                     CGENativeLibrary.filterImage_MultipleEffects(toTransform, config, 1.0f)
 
                         }))
-                        .into(object : BitmapImageViewTarget(mBinding!!.imgFilter) {
-                            override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-                                getView().setImageDrawable(RoundedBitmapDrawableFactory.create(mBinding!!.imgFilter.context.resources, resource)
-                                        .apply {
-                                            cornerRadius = 4F
-                                        })
-                            }
-                        })
+                        .into(mBinding!!.imgFilter)
             } else {
                 Glide.with(itemView.context)
                         .asBitmap()
@@ -93,15 +92,9 @@ class PreviewImagesAdapter(private val configs: List<String> = ArrayList(),
                                     CGENativeLibrary.filterImage_MultipleEffects(toTransform, config, 1.0f)
 
                         }))
-                        .into(object : BitmapImageViewTarget(mBinding!!.imgFilter) {
-                            override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-                                getView().setImageDrawable(RoundedBitmapDrawableFactory.create(mBinding!!.imgFilter.context.resources, resource)
-                                        .apply {
-                                    cornerRadius = 4F
-                                })
-                            }
-                        })
+                        .into(mBinding!!.imgFilter)
             }
+            mBinding.imgFilter.borderWidth = if(selectedPos == adapterPosition) 4F else 0F
         }
     }
 
