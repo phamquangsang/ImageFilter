@@ -49,12 +49,12 @@ class PreviewActivity : AppCompatActivity() {
 
         viewModel = ViewModelProviders.of(this).get(PreviewViewModel::class.java)
         viewModel.openPreviewEvent.observe(this, Observer { mediaFilePath ->
-//            mediaFilePath?.run {
-//                supportFragmentManager.beginTransaction()
-//                        .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(this))
-//                        .addToBackStack(null)
-//                        .commit()
-//            }
+            mediaFilePath?.run {
+                supportFragmentManager.beginTransaction()
+                        .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(this))
+                        .addToBackStack(null)
+                        .commit()
+            }
         })
         checkToRequestPermissions()
     }

@@ -89,6 +89,7 @@ class CameraFragment : Fragment() {
                             }
                         })
                         .start()
+                mBinding.btnPickFilters.isSelected = true
             } else {
                 mBinding.rcImgPreview.animate()
                         .alpha(0F)
@@ -100,7 +101,10 @@ class CameraFragment : Fragment() {
                                 mBinding.rcImgPreview.isVisible = false
                             }
                         }).start()
+                mBinding.btnPickFilters.isSelected = false
             }
+
+
         }
         mBinding.btnGallery.setOnClickListener {
 

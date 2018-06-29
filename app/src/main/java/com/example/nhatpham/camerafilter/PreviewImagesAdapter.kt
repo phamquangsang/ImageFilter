@@ -3,6 +3,7 @@ package com.example.nhatpham.camerafilter
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.os.Handler
 import android.support.v4.graphics.drawable.RoundedBitmapDrawable
 import android.support.v4.graphics.drawable.RoundedBitmapDrawableFactory
 import android.support.v7.widget.RecyclerView
@@ -22,10 +23,14 @@ import com.example.nhatpham.camerafilter.databinding.LayoutPreviewItemBinding
 
 import org.wysaid.nativePort.CGENativeLibrary
 import java.security.MessageDigest
+import java.util.concurrent.Executors
 
 class PreviewImagesAdapter(private val configs: List<String> = ArrayList(),
                            private val onItemInteractListener: PreviewImagesAdapter.OnItemInteractListener?)
     : RecyclerView.Adapter<PreviewImagesAdapter.ViewHolder>() {
+
+    val appExecutor = Executors.newSingleThreadExecutor()
+    val mainHandler = Handler()
 
     var imageUri: String? = null
     var selectedPos: Int = 0
@@ -66,33 +71,33 @@ class PreviewImagesAdapter(private val configs: List<String> = ArrayList(),
                         .asBitmap()
                         .load(imageUri)
                         .apply(RequestOptions.centerInsideTransform())
-                        .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
+                        .into(object : BitmapImageViewTarget(mBinding!!.imgFilter) {
 
-                            override fun updateDiskCacheKey(messageDigest: MessageDigest) {
-                                messageDigest.update("$imageUri-$config".toByteArray())
+                            override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
+                                appExecutor.submit {
+                                    val result = CGENativeLibrary.filterImage_MultipleEffects(resource, config, 1.0f)
+                                    mainHandler.post {
+                                        getView().setImageBitmap(result)
+                                    }
+                                }
                             }
-
-                            override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int) =
-                                    CGENativeLibrary.filterImage_MultipleEffects(toTransform, config, 1.0f)
-
-                        }))
-                        .into(mBinding!!.imgFilter)
+                        })
             } else {
                 Glide.with(itemView.context)
                         .asBitmap()
                         .load(R.drawable.default_filter)
                         .apply(RequestOptions.centerInsideTransform())
-                        .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
+                        .into(object : BitmapImageViewTarget(mBinding!!.imgFilter) {
 
-                            override fun updateDiskCacheKey(messageDigest: MessageDigest) {
-                                messageDigest.update(config.toByteArray())
+                            override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
+                                appExecutor.submit {
+                                    val result = CGENativeLibrary.filterImage_MultipleEffects(resource, config, 1.0f)
+                                    mainHandler.post {
+                                        getView().setImageBitmap(result)
+                                    }
+                                }
                             }
-
-                            override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int) =
-                                    CGENativeLibrary.filterImage_MultipleEffects(toTransform, config, 1.0f)
-
-                        }))
-                        .into(mBinding!!.imgFilter)
+                        })
             }
             mBinding.imgFilter.borderWidth = if(selectedPos == adapterPosition) 4F else 0F
         }
