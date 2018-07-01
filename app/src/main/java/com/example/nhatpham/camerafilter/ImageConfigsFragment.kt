@@ -47,7 +47,7 @@ class ImageConfigsFragment : Fragment() {
         }
 
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
-        previewImagesAdapter = PreviewImagesAdapter(MainActivity.EFFECT_CONFIGS.asList(), object : PreviewImagesAdapter.OnItemInteractListener {
+        previewImagesAdapter = PreviewImagesAdapter(context!!, MainActivity.EFFECT_CONFIGS.asList(), object : PreviewImagesAdapter.OnItemInteractListener {
 
             override fun onConfigSelected(selectedConfig: String) {
                 configChangeListener?.onFilterChanged(selectedConfig)

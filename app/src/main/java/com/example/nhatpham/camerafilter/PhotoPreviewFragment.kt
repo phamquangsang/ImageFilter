@@ -5,7 +5,6 @@ import android.animation.AnimatorListenerAdapter
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
 import android.os.Bundle
-import android.os.Handler
 import android.support.v4.app.Fragment
 import android.support.v7.widget.LinearLayoutManager
 import android.view.LayoutInflater
@@ -20,6 +19,7 @@ import com.example.nhatpham.camerafilter.databinding.FragmentPhotoPreviewBinding
 import org.wysaid.view.ImageGLSurfaceView
 import android.view.animation.AccelerateDecelerateInterpolator
 import androidx.core.view.isVisible
+import java.io.File
 
 
 class PhotoPreviewFragment : Fragment() {
@@ -47,7 +47,7 @@ class PhotoPreviewFragment : Fragment() {
         }
 
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
-        previewImagesAdapter = PreviewImagesAdapter(MainActivity.EFFECT_CONFIGS.asList(), object : PreviewImagesAdapter.OnItemInteractListener {
+        previewImagesAdapter = PreviewImagesAdapter(context!!, MainActivity.EFFECT_CONFIGS.asList(), object : PreviewImagesAdapter.OnItemInteractListener {
 
             override fun onConfigSelected(selectedConfig: String) {
                 currentConfig = selectedConfig
@@ -89,6 +89,14 @@ class PhotoPreviewFragment : Fragment() {
 
         mBinding.btnPickStickers.setOnClickListener {
             mBinding.btnPickStickers.isSelected = !mBinding.btnPickStickers.isSelected
+        }
+
+        mBinding.btnDone.setOnClickListener {
+            activity?.supportFragmentManager?.popBackStack()
+        }
+
+        mBinding.btnBack.setOnClickListener {
+            activity?.supportFragmentManager?.popBackStack()
         }
 
         Glide.with(this)

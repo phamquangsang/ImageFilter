@@ -1,11 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto">
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <android.support.constraint.ConstraintLayout
         android:id="@+id/layoutRoot"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
+
+        <FrameLayout
+            android:id="@+id/layoutBar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:background="#000000"
+            android:padding="4dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ImageView
+                android:id="@+id/btnBack"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/back" />
+
+            <TextView
+                android:id="@+id/tvRecordingTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="00:12"
+                android:textColor="@android:color/white"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/btnSwitch"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_gravity="top|end"
+                android:scaleType="centerInside"
+                android:src="@drawable/camera_switch" />
+        </FrameLayout>
 
         <org.wysaid.view.CameraRecordGLSurfaceView
             android:id="@+id/cameraView"
@@ -16,17 +54,7 @@
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <ImageView
-            android:id="@+id/btnSwitch"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_margin="16dp"
-            android:src="@drawable/camera_switch"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toBottomOf="@+id/layoutBar" />
 
         <android.support.v7.widget.RecyclerView
             android:id="@+id/rcImgPreview"
@@ -44,44 +72,76 @@
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintStart_toStartOf="parent" />
 
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/rcModes"
+            android:layout_width="160dp"
+            android:layout_height="wrap_content"
+            android:clipToPadding="false"
+            android:overScrollMode="never"
+            android:paddingStart="50dp"
+            android:paddingLeft="50dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="50dp"
+            android:paddingRight="50dp"
+            android:paddingBottom="4dp"
+            app:layout_constraintEnd_toStartOf="@+id/btnPickFilters"
+            app:layout_constraintLeft_toRightOf="@+id/btnGallery"
+            app:layout_constraintRight_toLeftOf="@+id/btnPickFilters"
+            app:layout_constraintStart_toEndOf="@+id/btnGallery"
+            app:layout_constraintTop_toBottomOf="@+id/cameraView"
+            tools:visibility="gone" />
+
         <ImageView
             android:id="@+id/btnGallery"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="20dp"
             android:src="@drawable/gallery"
-            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintBottom_toBottomOf="@+id/btnTakePhoto"
             app:layout_constraintEnd_toStartOf="@+id/btnTakePhoto"
+            app:layout_constraintHorizontal_bias="0.35"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toLeftOf="@+id/btnTakePhoto"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/cameraView" />
+            app:layout_constraintTop_toTopOf="@+id/btnTakePhoto" />
 
         <android.support.design.widget.FloatingActionButton
             android:id="@+id/btnTakePhoto"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:src="@drawable/camera"
-            app:fabSize="normal"
             app:backgroundTint="@android:color/white"
-            app:layout_constraintBottom_toBottomOf="parent"
+            app:fabSize="normal"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/cameraView" />
+            app:layout_constraintTop_toBottomOf="@+id/rcModes" />
+
+        <android.support.design.widget.FloatingActionButton
+            android:id="@+id/btnRecord"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/start_record"
+            android:visibility="gone"
+            app:backgroundTint="@android:color/white"
+            app:fabSize="normal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/rcModes" />
 
         <ImageView
             android:id="@+id/btnPickFilters"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:src="@drawable/filter_state"
-            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintBottom_toBottomOf="@+id/btnTakePhoto"
             app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.65"
             app:layout_constraintLeft_toRightOf="@+id/btnTakePhoto"
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintStart_toEndOf="@+id/btnTakePhoto"
-            app:layout_constraintTop_toBottomOf="@+id/cameraView" />
+            app:layout_constraintTop_toTopOf="@+id/btnTakePhoto" />
     </android.support.constraint.ConstraintLayout>
 </layout>

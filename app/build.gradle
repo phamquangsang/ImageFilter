@@ -47,6 +47,7 @@ dependencies {
     kapt 'com.github.bumptech.glide:compiler:4.7.1'
 
     implementation 'com.makeramen:roundedimageview:2.3.0'
+    implementation 'com.github.Vatican-Cameos:CarouselPicker:v1.0'
 
     //All arch: armeabi, armeabi-v7a, arm64-v8a, mips, x86
     implementation 'org.wysaid:gpuimage-plus:2.5.0'

@@ -10,6 +10,8 @@ import android.graphics.BitmapFactory
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.view.Window
+import android.view.WindowManager
 import com.example.nhatpham.camerafilter.databinding.ActivityPreviewBinding
 import org.wysaid.common.Common
 import org.wysaid.nativePort.CGENativeLibrary
@@ -24,6 +26,10 @@ class PreviewActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestWindowFeature(Window.FEATURE_NO_TITLE)
+        window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN)
+
         setContentView(R.layout.activity_preview)
 
         CGENativeLibrary.setLoadImageCallback(object : CGENativeLibrary.LoadImageCallback {
