@@ -65,7 +65,7 @@ class VideoPreviewFragment : Fragment() {
 
     private fun initialize() {
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
-        previewImagesAdapter = PreviewImagesAdapter(context!!, EFFECT_CONFIGS.asList(), object : PreviewImagesAdapter.OnItemInteractListener {
+        previewImagesAdapter = PreviewImagesAdapter(context!!, EFFECT_CONFIGS.keys.toList(), object : PreviewImagesAdapter.OnItemInteractListener {
             override fun onConfigSelected(selectedConfig: String) {
                 currentConfig = selectedConfig
                 mBinding.videoView.setFilterWithConfig(selectedConfig)

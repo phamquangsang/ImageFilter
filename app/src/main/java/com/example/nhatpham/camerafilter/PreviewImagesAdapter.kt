@@ -30,7 +30,7 @@ import java.security.MessageDigest
 import java.util.concurrent.Executors
 
 class PreviewImagesAdapter(private val context: Context,
-                           private val configs: List<String> = ArrayList(),
+                           private val configs: List<String> = emptyList(),
                            private val onItemInteractListener: PreviewImagesAdapter.OnItemInteractListener?)
     : RecyclerView.Adapter<PreviewImagesAdapter.ViewHolder>() {
 
@@ -125,6 +125,7 @@ class PreviewImagesAdapter(private val context: Context,
                 mBinding.imgFilter.scaleY = defaultScale
             }
             mBinding.imgFilter.borderColor = if (selectedPos == adapterPosition) selectedColor else Color.WHITE
+            mBinding.tvName.text = EFFECT_CONFIGS[config]
         }
 
         fun bindData(config: String, payload: Bundle) {
