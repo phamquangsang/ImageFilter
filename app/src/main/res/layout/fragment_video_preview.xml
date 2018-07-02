@@ -6,30 +6,138 @@
     <android.support.constraint.ConstraintLayout
         android:id="@+id/layoutRoot"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        tools:context=".MainActivity">
+        android:layout_height="match_parent">
 
-        <org.wysaid.view.ImageGLSurfaceView
-            android:id="@+id/imageView"
+        <FrameLayout
+            android:id="@+id/layoutBar"
             android:layout_width="0dp"
-            android:layout_height="0dp"
-            app:layout_constraintBottom_toTopOf="@+id/rcImgPreview"
+            android:layout_height="wrap_content"
+            android:background="#000000"
+            android:padding="4dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ImageView
+                android:id="@+id/btnBack"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/back" />
+
+            <TextView
+                android:id="@+id/tvRecordingTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:textColor="@android:color/white"
+                android:visibility="gone"
+                tools:visibility="visible"
+                tools:text="00:13"/>
+
+            <ImageView
+                android:id="@+id/btnUndo"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_gravity="top|end"
+                android:scaleType="centerInside"
+                android:src="@drawable/undo" />
+        </FrameLayout>
+
+        <org.wysaid.view.VideoPlayerGLSurfaceView
+            android:id="@+id/videoView"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintDimensionRatio="3:4"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/layoutBar" />
+
+        <ImageView
+            android:id="@+id/imgVideoThumb"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:scaleType="centerCrop"
+            app:layout_constraintBottom_toBottomOf="@+id/videoView"
+            app:layout_constraintEnd_toEndOf="@+id/videoView"
+            app:layout_constraintLeft_toLeftOf="@+id/videoView"
+            app:layout_constraintRight_toRightOf="@+id/videoView"
+            app:layout_constraintStart_toStartOf="@+id/videoView"
+            app:layout_constraintTop_toTopOf="@+id/videoView" />
+
+        <ImageView
+            android:id="@+id/btnPlay"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/circle_play"
+            app:layout_constraintBottom_toBottomOf="@+id/videoView"
+            app:layout_constraintEnd_toEndOf="@+id/videoView"
+            app:layout_constraintLeft_toLeftOf="@+id/videoView"
+            app:layout_constraintRight_toRightOf="@+id/videoView"
+            app:layout_constraintStart_toStartOf="@+id/videoView"
+            app:layout_constraintTop_toTopOf="@+id/videoView" />
 
         <android.support.v7.widget.RecyclerView
             android:id="@+id/rcImgPreview"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:minHeight="72dp"
-            app:layout_constraintBottom_toBottomOf="parent"
+            android:paddingStart="1dp"
+            android:paddingLeft="1dp"
+            android:paddingEnd="1dp"
+            android:paddingRight="1dp"
+            android:paddingBottom="1dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="@+id/videoView"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintStart_toStartOf="parent" />
+
+        <ImageView
+            android:id="@+id/btnPickStickers"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="20dp"
+            android:src="@drawable/sticker_state"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/btnDone"
+            app:layout_constraintHorizontal_bias="0.35"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toLeftOf="@+id/btnDone"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/videoView" />
+
+        <android.support.design.widget.FloatingActionButton
+            android:id="@+id/btnDone"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/done_edit"
+            app:backgroundTint="@android:color/white"
+            app:fabSize="normal"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/videoView" />
+
+        <ImageView
+            android:id="@+id/btnPickFilters"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/filter_state"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.65"
+            app:layout_constraintLeft_toRightOf="@+id/btnDone"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/btnDone"
+            app:layout_constraintTop_toBottomOf="@+id/videoView" />
     </android.support.constraint.ConstraintLayout>
 </layout>

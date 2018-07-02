@@ -15,7 +15,6 @@ import android.support.v7.widget.PagerSnapHelper
 import android.support.v7.widget.RecyclerView
 import android.text.format.DateUtils
 import android.util.Log
-import android.util.TimeUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -57,8 +56,7 @@ class CameraFragment : Fragment() {
     private fun initialize() {
         viewModel = ViewModelProviders.of(activity!!).get(PreviewViewModel::class.java)
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
-        previewImagesAdapter = PreviewImagesAdapter(context!!, MainActivity.EFFECT_CONFIGS.asList(), object : PreviewImagesAdapter.OnItemInteractListener {
-
+        previewImagesAdapter = PreviewImagesAdapter(context!!, EFFECT_CONFIGS.asList(), object : PreviewImagesAdapter.OnItemInteractListener {
             override fun onConfigSelected(selectedConfig: String) {
                 currentConfig = selectedConfig
                 mBinding.cameraView.setFilterWithConfig(selectedConfig)
@@ -103,7 +101,7 @@ class CameraFragment : Fragment() {
                         val filePath = ImageUtil.saveBitmap(bitmap)
                         bitmap.recycle()
                         activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(filePath))))
-                        viewModel.openPreviewEvent.value = filePath
+                        viewModel.openPhotoPreviewEvent.value = filePath
                     }
                 }, null, currentConfig, 1.0f, true)
             }
@@ -205,13 +203,31 @@ class CameraFragment : Fragment() {
     override fun onStop() {
         super.onStop()
         cancelScheduleRecordTime()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
         scheduler.shutdown()
+    }
+
+    private fun onStartRecording() {
+        isRecording = true
+        updateRecordingDisplay()
+        scheduleRecordTime()
+    }
+
+    private fun onFinishRecording(recordedFilePath: String) {
+        context?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(recordedFilePath))))
+        isRecording = false
+        updateRecordingDisplay()
+        cancelScheduleRecordTime()
+        viewModel.openVideoPreviewEvent.value = recordedFilePath
     }
 
     inner class RecordListener : View.OnClickListener {
 
         private var isValid = true
-        private var recordFilename: String = ""
+        private var recordFilePath: String = ""
 
         override fun onClick(v: View?)  {
             val LOG_TAG = CameraRecordGLSurfaceView.LOG_TAG;
@@ -224,16 +240,12 @@ class CameraFragment : Fragment() {
 
             if (!mBinding.cameraView.isRecording) {
                 Log.i(LOG_TAG, "Start recording...")
-                recordFilename = ImageUtil.getPath() + "/rec_" + System.currentTimeMillis() + ".mp4"
+                recordFilePath = ImageUtil.getPath() + "/rec_" + System.currentTimeMillis() + ".mp4"
                 //                recordFilename = ImageUtil.getPath(CameraDemoActivity.this, false) + "/rec_1.mp4";
-                mBinding.cameraView.startRecording(recordFilename, { success ->
+                mBinding.cameraView.startRecording(recordFilePath, { success ->
                     if (success) {
-                        mainHandler.post {
-                            isRecording = true
-                            updateRecordingDisplay()
-                            scheduleRecordTime()
-                        }
-                        FileUtil.saveTextContent(recordFilename, FileUtil.getPath() + "/lastVideoPath.txt")
+                        mainHandler.post { onStartRecording() }
+                        FileUtil.saveTextContent(recordFilePath, FileUtil.getPath() + "/lastVideoPath.txt")
                     } else {
                         mainHandler.post { Toast.makeText(this@CameraFragment.context, "Start recording failed", Toast.LENGTH_SHORT).show() }
                     }
@@ -245,11 +257,7 @@ class CameraFragment : Fragment() {
                     Log.i(LOG_TAG, "End recording OK")
                     isValid = true
 
-                    mainHandler.post {
-                        isRecording = false
-                        updateRecordingDisplay()
-                        cancelScheduleRecordTime()
-                    }
+                    mainHandler.post { onFinishRecording(recordFilePath) }
                 }
             }
         }

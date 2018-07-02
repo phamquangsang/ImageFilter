@@ -155,37 +155,6 @@ class MainActivity : AppCompatActivity() {
         private const val REQUEST_READ_EXTERNAL_PERMISSIONS = 1
         private const val OPEN_GALLERY_REQUEST_CODE = 1
 
-        val EFFECT_CONFIGS = arrayOf("", // ASCII art (字符画效果)
-                "@beautify face 1 480 640", //Beautify
-                "@adjust lut A.jpg",
-                "@adjust lut A-2.jpg",
-                "@adjust lut A-3.jpg",
-                "@adjust lut A-4.jpg",
-                "@adjust lut A-5.jpg",
-                "@adjust lut A-6.jpg",
-                "@adjust lut A-7.jpg",
-                "@adjust lut A-8.jpg",
-                "@adjust lut A-9.jpg",
-                "@adjust lut A-10.jpg",
-                "@adjust lut A-11.jpg",
-                "@adjust lut A-12.jpg",
-                "@adjust lut A-13.jpg",
-                "@adjust lut A-14.jpg",
-                "@adjust lut A-15.jpg",
-                "@adjust lut lookup_amatorka.png",
-                "@adjust lut lookup_fgfacolor.png",
-                "@adjust lut lookup_lofi.png",
-                "@adjust lut lookup_mayfair.png",
-                "@adjust lut lookup_miss_etikate.png",
-                "@adjust lut lookup_nashville.png",
-                "@adjust lut lookup_nguocnang.png",
-                "@adjust lut lookup_soft_elegance_1.png",
-                "@adjust lut lookup_soft_elegance_2.png",
-                "@adjust lut filmstock.png",
-                "@adjust lut foggy_night.png",
-                "@adjust lut soft_warming.png",
-                "#unpack @blur lerp 0.75", //can adjust blur intensity
-                "@dynamic wave 0.5")
     }
 
 
@@ -216,12 +185,10 @@ class MainActivity : AppCompatActivity() {
                 val type = split[0]
 
                 var contentUri: Uri? = null
-                if ("image" == type) {
-                    contentUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-                } else if ("video" == type) {
-                    contentUri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-                } else if ("audio" == type) {
-                    contentUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                when (type) {
+                    "image" -> contentUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                    "video" -> contentUri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                    "audio" -> contentUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
                 }
 
                 val selection = "_id=?"
@@ -253,7 +220,7 @@ class MainActivity : AppCompatActivity() {
      * @param selectionArgs (Optional) Selection arguments used in the query.
      * @return The value of the _data column, which is typically a file path.
      */
-    fun getDataColumn(context: Context, uri: Uri?, selection: String?,
+    private fun getDataColumn(context: Context, uri: Uri?, selection: String?,
                       selectionArgs: Array<String>?): String? {
 
         var cursor: Cursor? = null
@@ -277,31 +244,23 @@ class MainActivity : AppCompatActivity() {
      * @param uri The Uri to check.
      * @return Whether the Uri authority is ExternalStorageProvider.
      */
-    fun isExternalStorageDocument(uri: Uri): Boolean {
-        return "com.android.externalstorage.documents" == uri.authority
-    }
+    fun isExternalStorageDocument(uri: Uri) = "com.android.externalstorage.documents" == uri.authority
 
     /**
      * @param uri The Uri to check.
      * @return Whether the Uri authority is DownloadsProvider.
      */
-    fun isDownloadsDocument(uri: Uri): Boolean {
-        return "com.android.providers.downloads.documents" == uri.authority
-    }
+    fun isDownloadsDocument(uri: Uri) = "com.android.providers.downloads.documents" == uri.authority
 
     /**
      * @param uri The Uri to check.
      * @return Whether the Uri authority is MediaProvider.
      */
-    fun isMediaDocument(uri: Uri): Boolean {
-        return "com.android.providers.media.documents" == uri.authority
-    }
+    fun isMediaDocument(uri: Uri) = "com.android.providers.media.documents" == uri.authority
 
     /**
      * @param uri The Uri to check.
      * @return Whether the Uri authority is Google Photos.
      */
-    fun isGooglePhotosUri(uri: Uri): Boolean {
-        return "com.google.android.apps.photos.content" == uri.authority
-    }
+    fun isGooglePhotosUri(uri: Uri) = "com.google.android.apps.photos.content" == uri.authority
 }

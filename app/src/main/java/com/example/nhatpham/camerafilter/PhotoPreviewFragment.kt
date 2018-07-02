@@ -47,7 +47,7 @@ class PhotoPreviewFragment : Fragment() {
         }
 
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
-        previewImagesAdapter = PreviewImagesAdapter(context!!, MainActivity.EFFECT_CONFIGS.asList(), object : PreviewImagesAdapter.OnItemInteractListener {
+        previewImagesAdapter = PreviewImagesAdapter(context!!, EFFECT_CONFIGS.asList(), object : PreviewImagesAdapter.OnItemInteractListener {
 
             override fun onConfigSelected(selectedConfig: String) {
                 currentConfig = selectedConfig
@@ -56,6 +56,10 @@ class PhotoPreviewFragment : Fragment() {
         })
         previewImagesAdapter.imageUri = photoUri
         mBinding.rcImgPreview.adapter = previewImagesAdapter
+
+        mBinding.btnPickStickers.setOnClickListener {
+            mBinding.btnPickStickers.isSelected = !mBinding.btnPickStickers.isSelected
+        }
 
         mBinding.btnPickFilters.setOnClickListener {
             if (!mBinding.rcImgPreview.isVisible) {
@@ -85,10 +89,6 @@ class PhotoPreviewFragment : Fragment() {
                         }).start()
                 mBinding.btnPickFilters.isSelected = false
             }
-        }
-
-        mBinding.btnPickStickers.setOnClickListener {
-            mBinding.btnPickStickers.isSelected = !mBinding.btnPickStickers.isSelected
         }
 
         mBinding.btnDone.setOnClickListener {

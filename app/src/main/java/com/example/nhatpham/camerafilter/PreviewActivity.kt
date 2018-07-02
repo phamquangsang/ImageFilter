@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
@@ -15,6 +16,7 @@ import android.view.WindowManager
 import com.example.nhatpham.camerafilter.databinding.ActivityPreviewBinding
 import org.wysaid.common.Common
 import org.wysaid.nativePort.CGENativeLibrary
+import java.io.File
 import java.io.IOException
 import java.io.InputStream
 
@@ -54,14 +56,23 @@ class PreviewActivity : AppCompatActivity() {
         }, null)
 
         viewModel = ViewModelProviders.of(this).get(PreviewViewModel::class.java)
-        viewModel.openPreviewEvent.observe(this, Observer { mediaFilePath ->
-            mediaFilePath?.run {
+        viewModel.openPhotoPreviewEvent.observe(this, Observer { photoFilePath ->
+            if (photoFilePath != null && photoFilePath.isNotEmpty()) {
                 supportFragmentManager.beginTransaction()
-                        .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(this))
+                        .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(photoFilePath))
                         .addToBackStack(null)
                         .commit()
             }
         })
+        viewModel.openVideoPreviewEvent.observe(this, Observer { videoFilePath ->
+            if (videoFilePath != null && videoFilePath.isNotEmpty()) {
+                supportFragmentManager.beginTransaction()
+                        .replace(R.id.fragment_container, VideoPreviewFragment.newInstance(videoFilePath))
+                        .addToBackStack(null)
+                        .commit()
+            }
+        })
+
         checkToRequestPermissions()
     }
 
@@ -92,7 +103,7 @@ class PreviewActivity : AppCompatActivity() {
 
         fun newIntent(context: Context, photoUri: String, isVideo: Boolean) = Intent(context, PreviewActivity::class.java)
                 .apply {
-            putExtra("nhat", photoUri)
-        }
+                    putExtra("nhat", photoUri)
+                }
     }
 }

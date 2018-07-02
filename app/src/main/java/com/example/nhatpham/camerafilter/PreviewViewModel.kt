@@ -4,5 +4,6 @@ import android.arch.lifecycle.ViewModel
 
 class PreviewViewModel : ViewModel() {
 
-    val openPreviewEvent = SingleLiveEvent<String>()
+    val openPhotoPreviewEvent = SingleLiveEvent<String>()
+    val openVideoPreviewEvent = SingleLiveEvent<String>()
 }
