@@ -2,6 +2,7 @@ package com.example.nhatpham.camerafilter
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.content.Intent
 import android.databinding.DataBindingUtil
 import android.media.MediaPlayer
 import android.net.Uri
@@ -21,7 +22,11 @@ import android.media.MediaMetadataRetriever
 import android.graphics.Bitmap
 import android.os.Handler
 import android.os.SystemClock
+import android.provider.MediaStore
 import android.text.format.DateUtils
+import org.wysaid.nativePort.CGEFFmpegNativeLibrary
+import org.wysaid.nativePort.CGEFFmpegNativeLibrary.generateVideoWithFilter
+import org.wysaid.nativePort.CGENativeLibrary
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
@@ -31,8 +36,8 @@ import java.util.concurrent.TimeUnit
 class VideoPreviewFragment : Fragment() {
 
     private lateinit var mBinding: FragmentVideoPreviewBinding
-    private val videoUri: String by lazy {
-        arguments?.getString(EXTRA_VIDEO_URI) ?: ""
+    private val videoUri: Uri? by lazy {
+        arguments?.getParcelable(EXTRA_VIDEO_URI) as? Uri
     }
 
     private val mainHandler = Handler()
@@ -84,11 +89,11 @@ class VideoPreviewFragment : Fragment() {
             }
         })
 
-        mBinding.videoView.setVideoUri(Uri.fromFile(File(videoUri)), { player ->
+        mBinding.videoView.setVideoUri(videoUri, { player ->
             mediaPlayer = player
         }, playCompletionCallback)
 
-        mBinding.imgVideoThumb.setImageBitmap(getThumbnail())
+        mBinding.imgVideoThumb.setImageBitmap(getThumbnail(context!!, videoUri!!))
 
         mBinding.btnPlay.setOnClickListener {
             mediaPlayer?.run {
@@ -134,28 +139,15 @@ class VideoPreviewFragment : Fragment() {
         }
 
         mBinding.btnDone.setOnClickListener {
+            val outputFileName = "${videoUri.toString().substringBefore(".mp4")}-new.mp4"
+            CGEFFmpegNativeLibrary.generateVideoWithFilter(outputFileName, videoUri.toString(), currentConfig, 1.0f, null, CGENativeLibrary.TextureBlendMode.CGE_BLEND_ADDREV, 1.0f, false)
+            activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(outputFileName))))
             activity?.supportFragmentManager?.popBackStack()
         }
 
         mBinding.btnBack.setOnClickListener {
             activity?.supportFragmentManager?.popBackStack()
         }
-    }
-
-    private fun getThumbnail(): Bitmap? {
-        var bitmap: Bitmap? = null
-        var mediaMetadataRetriever = MediaMetadataRetriever()
-        try {
-            mediaMetadataRetriever.setDataSource(videoUri)
-            bitmap = mediaMetadataRetriever.frameAtTime
-        } catch (e: Exception) {
-            e.printStackTrace()
-
-        } finally {
-            if (mediaMetadataRetriever != null)
-                mediaMetadataRetriever.release()
-        }
-        return bitmap
     }
 
     private fun scheduleRecordTime() {
@@ -197,10 +189,10 @@ class VideoPreviewFragment : Fragment() {
     companion object {
         private const val EXTRA_VIDEO_URI = "EXTRA_VIDEO_URI"
 
-        fun newInstance(videoUri: String): VideoPreviewFragment {
+        fun newInstance(videoUri: Uri): VideoPreviewFragment {
             return VideoPreviewFragment().apply {
                 arguments = Bundle().apply {
-                    putString(EXTRA_VIDEO_URI, videoUri)
+                    putParcelable(EXTRA_VIDEO_URI, videoUri)
                 }
             }
         }

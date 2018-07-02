@@ -4,7 +4,9 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.support.v4.app.Fragment
 import android.support.v7.widget.LinearLayoutManager
 import android.view.LayoutInflater
@@ -19,14 +21,15 @@ import com.example.nhatpham.camerafilter.databinding.FragmentPhotoPreviewBinding
 import org.wysaid.view.ImageGLSurfaceView
 import android.view.animation.AccelerateDecelerateInterpolator
 import androidx.core.view.isVisible
+import org.wysaid.myUtils.ImageUtil
 import java.io.File
 
 
 class PhotoPreviewFragment : Fragment() {
 
     private lateinit var mBinding: FragmentPhotoPreviewBinding
-    private val photoUri: String by lazy {
-        arguments?.getString(EXTRA_PHOTO_URI) ?: ""
+    private val photoUri: Uri? by lazy {
+        arguments?.getParcelable(EXTRA_PHOTO_URI) as? Uri
     }
 
     private lateinit var previewImagesAdapter: PreviewImagesAdapter
@@ -48,13 +51,14 @@ class PhotoPreviewFragment : Fragment() {
 
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
         previewImagesAdapter = PreviewImagesAdapter(context!!, EFFECT_CONFIGS.keys.toList(), object : PreviewImagesAdapter.OnItemInteractListener {
-
             override fun onConfigSelected(selectedConfig: String) {
                 currentConfig = selectedConfig
                 mBinding.imageView.setFilterWithConfig(selectedConfig)
             }
         })
-        previewImagesAdapter.imageUri = photoUri
+        Environment.DIRECTORY_PICTURES
+
+        previewImagesAdapter.imageUri = photoUri?.toString() ?: ""
         mBinding.rcImgPreview.adapter = previewImagesAdapter
 
         mBinding.btnPickStickers.setOnClickListener {
@@ -92,7 +96,12 @@ class PhotoPreviewFragment : Fragment() {
         }
 
         mBinding.btnDone.setOnClickListener {
-            activity?.supportFragmentManager?.popBackStack()
+            mBinding.imageView.getResultBitmap { bitmap ->
+                if (bitmap != null && photoUri != null) {
+                    ImageUtil.saveBitmap(bitmap, photoUri.toString())
+                    activity?.supportFragmentManager?.popBackStack()
+                }
+            }
         }
 
         mBinding.btnBack.setOnClickListener {
@@ -130,10 +139,10 @@ class PhotoPreviewFragment : Fragment() {
     companion object {
         private const val EXTRA_PHOTO_URI = "EXTRA_PHOTO_URI"
 
-        fun newInstance(photoUri: String): PhotoPreviewFragment {
+        fun newInstance(photoUri: Uri): PhotoPreviewFragment {
             return PhotoPreviewFragment().apply {
                 arguments = Bundle().apply {
-                    putString(EXTRA_PHOTO_URI, photoUri)
+                    putParcelable(EXTRA_PHOTO_URI, photoUri)
                 }
             }
         }

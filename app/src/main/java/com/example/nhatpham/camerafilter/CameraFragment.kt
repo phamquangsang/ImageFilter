@@ -9,6 +9,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.SystemClock
+import android.provider.MediaStore
+import android.provider.MediaStore.Images.Media.insertImage
 import android.support.v4.app.Fragment
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.PagerSnapHelper
@@ -98,10 +100,11 @@ class CameraFragment : Fragment() {
             if(!isRecording && currentMode == "Photo") {
                 mBinding.cameraView.takePicture({ bitmap ->
                     if (bitmap != null) {
-                        val filePath = ImageUtil.saveBitmap(bitmap)
+                        val filePath = ImageUtil.saveBitmap(bitmap, "${getPath()}/${generateImageFileName()}")
+                        val fileUri = Uri.fromFile(File(filePath))
                         bitmap.recycle()
-                        activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(filePath))))
-                        viewModel.openPhotoPreviewEvent.value = filePath
+                        activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, fileUri))
+                        viewModel.openPhotoPreviewEvent.value = fileUri
                     }
                 }, null, currentConfig, 1.0f, true)
             }
@@ -221,7 +224,7 @@ class CameraFragment : Fragment() {
         isRecording = false
         updateRecordingDisplay()
         cancelScheduleRecordTime()
-        viewModel.openVideoPreviewEvent.value = recordedFilePath
+        viewModel.openVideoPreviewEvent.value = Uri.fromFile(File(recordedFilePath))
     }
 
     inner class RecordListener : View.OnClickListener {
@@ -240,7 +243,7 @@ class CameraFragment : Fragment() {
 
             if (!mBinding.cameraView.isRecording) {
                 Log.i(LOG_TAG, "Start recording...")
-                recordFilePath = ImageUtil.getPath() + "/rec_" + System.currentTimeMillis() + ".mp4"
+                recordFilePath = "${getPath()}/${generateVideoFileName()}"
                 //                recordFilename = ImageUtil.getPath(CameraDemoActivity.this, false) + "/rec_1.mp4";
                 mBinding.cameraView.startRecording(recordFilePath, { success ->
                     if (success) {

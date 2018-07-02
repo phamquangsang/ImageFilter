@@ -35,7 +35,6 @@ class PreviewActivity : AppCompatActivity() {
         setContentView(R.layout.activity_preview)
 
         CGENativeLibrary.setLoadImageCallback(object : CGENativeLibrary.LoadImageCallback {
-
             override fun loadImage(name: String, arg: Any?): Bitmap? {
                 Log.i(Common.LOG_TAG, "Loading file: $name")
                 val am = assets
@@ -56,18 +55,18 @@ class PreviewActivity : AppCompatActivity() {
         }, null)
 
         viewModel = ViewModelProviders.of(this).get(PreviewViewModel::class.java)
-        viewModel.openPhotoPreviewEvent.observe(this, Observer { photoFilePath ->
-            if (photoFilePath != null && photoFilePath.isNotEmpty()) {
+        viewModel.openPhotoPreviewEvent.observe(this, Observer { photoUri ->
+            if (photoUri != null) {
                 supportFragmentManager.beginTransaction()
-                        .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(photoFilePath))
+                        .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(photoUri))
                         .addToBackStack(null)
                         .commit()
             }
         })
-        viewModel.openVideoPreviewEvent.observe(this, Observer { videoFilePath ->
-            if (videoFilePath != null && videoFilePath.isNotEmpty()) {
+        viewModel.openVideoPreviewEvent.observe(this, Observer { videoUri ->
+            if (videoUri != null) {
                 supportFragmentManager.beginTransaction()
-                        .replace(R.id.fragment_container, VideoPreviewFragment.newInstance(videoFilePath))
+                        .replace(R.id.fragment_container, VideoPreviewFragment.newInstance(videoUri))
                         .addToBackStack(null)
                         .commit()
             }

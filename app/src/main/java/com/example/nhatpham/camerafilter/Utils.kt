@@ -3,9 +3,26 @@ package com.example.nhatpham.camerafilter
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.util.DisplayMetrics
+import android.provider.MediaStore
+import android.content.ContentValues
+import android.content.ContentResolver
+import android.net.Uri
+import java.text.SimpleDateFormat
+import java.util.*
+import android.content.ContentUris
+import android.graphics.Matrix
+import android.os.Environment
+import org.wysaid.myUtils.ImageUtil
+import java.io.File
+import java.io.FileNotFoundException
+import java.io.IOException
+
+const val APP_NAME = "Mingle"
 
 val EFFECT_CONFIGS = mapOf("" to "None", // ASCII art (字符画效果)
         "@adjust lut A1.jpg" to "A1",
@@ -51,3 +68,31 @@ internal fun convertPixelsToDp(context: Context, px: Float): Int {
     val displayMetrics = context.resources.displayMetrics
     return Math.round(px / (displayMetrics.densityDpi / DisplayMetrics.DENSITY_DEFAULT.toFloat()))
 }
+
+internal fun getThumbnail(context: Context, videoUri: Uri): Bitmap? {
+    var bitmap: Bitmap? = null
+    var mediaMetadataRetriever = MediaMetadataRetriever()
+    try {
+        mediaMetadataRetriever.setDataSource(context, videoUri)
+        bitmap = mediaMetadataRetriever.frameAtTime
+    } catch (e: Exception) {
+        e.printStackTrace()
+    } finally {
+        if (mediaMetadataRetriever != null)
+            mediaMetadataRetriever.release()
+    }
+    return bitmap
+}
+
+internal fun getPath(): String {
+    val path = "${Environment.getExternalStorageDirectory().absolutePath}/$APP_NAME"
+    File(path).run {
+        if(!exists())
+            mkdirs()
+    }
+    return path
+}
+
+internal fun generateImageFileName() = "IMG_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Calendar.getInstance().time)}.jpg"
+
+internal fun generateVideoFileName() = "VID_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Calendar.getInstance().time)}.mp4"
