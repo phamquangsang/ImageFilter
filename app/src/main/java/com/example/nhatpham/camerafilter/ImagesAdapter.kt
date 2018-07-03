@@ -1,13 +1,17 @@
 package com.example.nhatpham.camerafilter
 
 import android.databinding.DataBindingUtil
+import android.os.SystemClock
 import android.support.v7.widget.RecyclerView
+import android.text.format.DateUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.view.isVisible
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import com.example.nhatpham.camerafilter.databinding.LayoutGalleryItemBinding
+import java.util.concurrent.TimeUnit
 
 class ImagesAdapter(private val images: List<GalleryFragment.Thumbnail> = emptyList(),
                     private var onItemInteractListener: OnItemInteractListener?)
@@ -21,7 +25,7 @@ class ImagesAdapter(private val images: List<GalleryFragment.Thumbnail> = emptyL
     override fun getItemCount() = images.size
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bindData(images[position].uri)
+        holder.bindData(images[position])
     }
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -34,11 +38,20 @@ class ImagesAdapter(private val images: List<GalleryFragment.Thumbnail> = emptyL
             }
         }
 
-        fun bindData(imageUri: String) {
+        fun bindData(thumbnail: GalleryFragment.Thumbnail) {
             Glide.with(itemView.context)
-                    .load(imageUri)
+                    .load(thumbnail.uri)
                     .apply(RequestOptions.centerInsideTransform())
                     .into(mBinding!!.image)
+
+            if(thumbnail.isVideo) {
+                mBinding.tvDuration.isVisible = true
+                mBinding.tvDuration.text = DateUtils.formatElapsedTime(TimeUnit.MILLISECONDS.toSeconds(thumbnail.duration))
+                mBinding.imgPlay.isVisible = true
+            } else {
+                mBinding.tvDuration.isVisible = false
+                mBinding.imgPlay.isVisible = false
+            }
         }
     }
 

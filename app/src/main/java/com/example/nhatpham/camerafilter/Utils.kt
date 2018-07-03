@@ -8,19 +8,11 @@ import android.media.MediaMetadataRetriever
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.util.DisplayMetrics
-import android.provider.MediaStore
-import android.content.ContentValues
-import android.content.ContentResolver
 import android.net.Uri
 import java.text.SimpleDateFormat
 import java.util.*
-import android.content.ContentUris
-import android.graphics.Matrix
 import android.os.Environment
-import org.wysaid.myUtils.ImageUtil
 import java.io.File
-import java.io.FileNotFoundException
-import java.io.IOException
 
 const val APP_NAME = "Mingle"
 
@@ -59,7 +51,7 @@ internal fun requestPermissions(activity: Activity, requestCode: Int, vararg per
     return false
 }
 
-internal fun convertDpToPixel(context: Context, dp: Float) : Int {
+internal fun convertDpToPixel(context: Context, dp: Float): Int {
     val displayMetrics = context.resources.displayMetrics
     return Math.round(dp * (displayMetrics.densityDpi / DisplayMetrics.DENSITY_DEFAULT.toFloat()))
 }
@@ -87,7 +79,7 @@ internal fun getThumbnail(context: Context, videoUri: Uri): Bitmap? {
 internal fun getPath(): String {
     val path = "${Environment.getExternalStorageDirectory().absolutePath}/$APP_NAME"
     File(path).run {
-        if(!exists())
+        if (!exists())
             mkdirs()
     }
     return path

@@ -12,6 +12,8 @@ import android.view.ViewGroup
 import android.provider.MediaStore
 import android.support.v7.widget.GridLayoutManager
 import com.example.nhatpham.camerafilter.databinding.FragmentGalleryBinding
+import kotlin.Comparator
+import kotlin.collections.ArrayList
 
 class GalleryFragment : Fragment() {
 
@@ -29,9 +31,18 @@ class GalleryFragment : Fragment() {
 
         mBinding.rcImages.layoutManager = GridLayoutManager(context, 3, GridLayoutManager.VERTICAL, false)
         mBinding.rcImages.addItemDecoration(SpacesItemDecoration(resources.getDimensionPixelSize(R.dimen.gallery_space_item_size)))
-        mBinding.rcImages.adapter = ImagesAdapter(getImageThumbnails(), object : ImagesAdapter.OnItemInteractListener{
+
+        val thumbnails = getImageThumbnails().also {
+            it.addAll(0, getVideoThumbnails())
+        }.also {
+            it.sortWith(Comparator { o1, o2 -> (o2.id - o1.id).toInt() })
+        }
+        mBinding.rcImages.adapter = ImagesAdapter(thumbnails, object : ImagesAdapter.OnItemInteractListener {
             override fun onThumbnailSelected(thumbnail: Thumbnail) {
-                viewModel.openPhotoPreviewEvent.value = getOriginImageUri(thumbnail.originImageId)
+                if (thumbnail.isVideo)
+                    viewModel.openVideoPreviewEvent.value = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, thumbnail.id)
+                else
+                    viewModel.openPhotoPreviewEvent.value = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, thumbnail.id)
             }
         })
         mBinding.btnBack.setOnClickListener {
@@ -39,19 +50,20 @@ class GalleryFragment : Fragment() {
         }
     }
 
-    private fun getImageThumbnails(): List<Thumbnail> {
-        val projection = arrayOf(MediaStore.Images.Thumbnails._ID, MediaStore.Images.Thumbnails.DATA, MediaStore.Images.Thumbnails.IMAGE_ID)
-        val cursor = context!!.contentResolver.query(MediaStore.Images.Thumbnails.EXTERNAL_CONTENT_URI,
+    private fun getImageThumbnails(): ArrayList<Thumbnail> {
+        val projection = arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.DATA)
+        val cursor = context!!.contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                 projection,
                 null,
                 null,
-                "${MediaStore.Images.Thumbnails._ID} DESC")
+                MediaStore.Images.Media.DEFAULT_SORT_ORDER)
         val result = ArrayList<Thumbnail>(cursor.count)
         if (cursor.moveToFirst()) {
-            val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Thumbnails.DATA)
-            val originImageIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Thumbnails.IMAGE_ID)
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+            val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
+
             do {
-                result.add(Thumbnail(cursor.getString(dataColumn), cursor.getInt(originImageIdColumn)))
+                result.add(Thumbnail(cursor.getLong(idColumn), cursor.getString(dataColumn)))
             } while (cursor.moveToNext())
         }
         cursor.close()
@@ -67,30 +79,52 @@ class GalleryFragment : Fragment() {
                 arrayOf("$id"),
                 null)
         if (cursor.moveToFirst()) {
-            return ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)))
+            return ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)))
         }
         cursor.close()
         return null
     }
 
-    private fun getVideoThumbnails(): List<Thumbnail> {
-        val projection = arrayOf(MediaStore.Images.Thumbnails._ID, MediaStore.Images.Thumbnails.DATA, MediaStore.Images.Thumbnails.IMAGE_ID)
-        val cursor = context!!.contentResolver.query(MediaStore.Images.Thumbnails.EXTERNAL_CONTENT_URI,
+    private fun getVideoThumbnails(): ArrayList<Thumbnail> {
+        val projection = arrayOf(MediaStore.Video.Media._ID,
+                MediaStore.Video.Media.DATA, MediaStore.Video.Media.DURATION)
+        val cursor = context!!.contentResolver.query(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
                 projection,
                 null,
                 null,
-                "${MediaStore.Images.Thumbnails._ID} DESC")
+                MediaStore.Video.Media.DEFAULT_SORT_ORDER)
         val result = ArrayList<Thumbnail>(cursor.count)
         if (cursor.moveToFirst()) {
-            val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Thumbnails.DATA)
-            val originImageIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Thumbnails.IMAGE_ID)
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+            val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATA)
+            val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
             do {
-                result.add(Thumbnail(cursor.getString(dataColumn), cursor.getInt(originImageIdColumn)))
+                result.add(Thumbnail(cursor.getLong(idColumn), cursor.getString(dataColumn), true, cursor.getLong(durationColumn)))
             } while (cursor.moveToNext())
         }
         cursor.close()
         return result
     }
 
-    data class Thumbnail(val uri: String, val originImageId: Int)
+    private fun getOriginVideoUri(id: Int): Uri? {
+        val projection = arrayOf(MediaStore.Video.Media._ID, MediaStore.Video.Media.DATA)
+        val selection = "${MediaStore.Video.Media._ID} = ?"
+        val cursor = context!!.contentResolver.query(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                arrayOf("$id"),
+                null)
+        if (cursor.moveToFirst()) {
+            return ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                    cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)))
+        }
+        cursor.close()
+        return null
+    }
+
+    data class Thumbnail(val id: Long,
+                         val uri: String,
+                         val isVideo: Boolean = false,
+                         val duration: Long = 0)
 }

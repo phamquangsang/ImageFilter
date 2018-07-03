@@ -6,27 +6,18 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
-import android.support.v4.graphics.drawable.RoundedBitmapDrawable
-import android.support.v4.graphics.drawable.RoundedBitmapDrawableFactory
 import android.support.v7.widget.RecyclerView
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.os.bundleOf
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.DecodeFormat
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool
-import com.bumptech.glide.load.resource.bitmap.BitmapTransformation
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.BitmapImageViewTarget
 import com.bumptech.glide.request.transition.Transition
 import com.example.nhatpham.camerafilter.databinding.LayoutPreviewItemBinding
-import com.makeramen.roundedimageview.RoundedImageView.DEFAULT_BORDER_WIDTH
 
 import org.wysaid.nativePort.CGENativeLibrary
-import java.security.MessageDigest
 import java.util.concurrent.Executors
 
 class PreviewImagesAdapter(private val context: Context,
@@ -125,7 +116,6 @@ class PreviewImagesAdapter(private val context: Context,
                 mBinding.imgFilter.scaleY = defaultScale
             }
             mBinding.imgFilter.borderColor = if (selectedPos == adapterPosition) selectedColor else Color.WHITE
-            mBinding.tvName.text = EFFECT_CONFIGS[config]
         }
 
         fun bindData(config: String, payload: Bundle) {

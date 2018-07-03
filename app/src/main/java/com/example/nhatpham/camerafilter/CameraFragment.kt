@@ -45,7 +45,7 @@ class CameraFragment : Fragment() {
     private var currentMode = "Photo"
     private var snapHelper = PagerSnapHelper()
     private var scheduler = Executors.newSingleThreadScheduledExecutor()
-    private var timeRecordingFuture : ScheduledFuture<*>? = null
+    private var timeRecordingFuture: ScheduledFuture<*>? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_camera, container, false)
@@ -69,7 +69,7 @@ class CameraFragment : Fragment() {
         snapHelper.attachToRecyclerView(mBinding.rcModes)
         modesAdapter = ModesAdapter(arrayListOf("Photo", "Video"), object : ModesAdapter.OnItemInteractListener {
             override fun onModeSelected(mode: String, position: Int) {
-                if(isRecording)
+                if (isRecording)
                     return
                 currentMode = mode
                 updateModeDisplay()
@@ -80,13 +80,13 @@ class CameraFragment : Fragment() {
         mBinding.rcModes.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: RecyclerView?, newState: Int) {
                 super.onScrollStateChanged(recyclerView, newState)
-                if(newState != RecyclerView.SCROLL_STATE_IDLE && isRecording)
+                if (newState != RecyclerView.SCROLL_STATE_IDLE && isRecording)
                     return
 
                 val layoutManager = recyclerView?.layoutManager
-                if(layoutManager is LinearLayoutManager) {
+                if (layoutManager is LinearLayoutManager) {
                     val pos = layoutManager.getPosition(snapHelper.findSnapView(layoutManager))
-                    if(pos != RecyclerView.NO_POSITION) {
+                    if (pos != RecyclerView.NO_POSITION) {
                         currentMode = modesAdapter.getItem(pos)
                         updateModeDisplay()
                     }
@@ -95,7 +95,7 @@ class CameraFragment : Fragment() {
         })
 
         mBinding.btnTakePhoto.setOnClickListener {
-            if(!isRecording && currentMode == "Photo") {
+            if (!isRecording && currentMode == "Photo") {
                 mBinding.cameraView.takePicture({ bitmap ->
                     if (bitmap != null) {
                         val filePath = ImageUtil.saveBitmap(bitmap, "${getPath()}/${generateImageFileName()}")
@@ -171,7 +171,7 @@ class CameraFragment : Fragment() {
     }
 
     private fun updateRecordingDisplay() {
-        mBinding.btnRecord.setImageResource(if(isRecording) R.drawable.stop_recording else R.drawable.start_record)
+        mBinding.btnRecord.setImageResource(if (isRecording) R.drawable.stop_recording else R.drawable.start_record)
     }
 
     private fun scheduleRecordTime() {
@@ -230,7 +230,7 @@ class CameraFragment : Fragment() {
         private var isValid = true
         private var recordFilePath: String = ""
 
-        override fun onClick(v: View?)  {
+        override fun onClick(v: View?) {
             val LOG_TAG = CameraRecordGLSurfaceView.LOG_TAG;
 
             if (!isValid) {

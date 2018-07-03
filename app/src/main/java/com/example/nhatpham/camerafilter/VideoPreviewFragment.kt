@@ -18,14 +18,10 @@ import androidx.core.view.isVisible
 import com.example.nhatpham.camerafilter.databinding.FragmentVideoPreviewBinding
 import org.wysaid.common.Common
 import org.wysaid.view.VideoPlayerGLSurfaceView
-import android.media.MediaMetadataRetriever
-import android.graphics.Bitmap
 import android.os.Handler
 import android.os.SystemClock
-import android.provider.MediaStore
 import android.text.format.DateUtils
 import org.wysaid.nativePort.CGEFFmpegNativeLibrary
-import org.wysaid.nativePort.CGEFFmpegNativeLibrary.generateVideoWithFilter
 import org.wysaid.nativePort.CGENativeLibrary
 import java.io.File
 import java.util.concurrent.Executors

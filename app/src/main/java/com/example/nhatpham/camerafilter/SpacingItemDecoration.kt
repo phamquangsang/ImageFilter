@@ -1,6 +1,7 @@
 package com.example.nhatpham.camerafilter
 
 import android.graphics.Rect
+import android.support.v7.widget.GridLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.view.View
 
@@ -9,14 +10,9 @@ internal class SpacesItemDecoration(private val space: Int) : RecyclerView.ItemD
 
     override fun getItemOffsets(outRect: Rect, view: View,
                                 parent: RecyclerView, state: RecyclerView.State) {
-        outRect.right = space
-        outRect.bottom = space
-        outRect.top = space
-
-        if (parent.getChildLayoutPosition(view) == 0) {
-            outRect.top = space
-        } else {
-            outRect.top = 0
+        val layoutManager = parent.layoutManager
+        if(layoutManager is GridLayoutManager) {
+            outRect.set(space, space, space, space)
         }
     }
 }
