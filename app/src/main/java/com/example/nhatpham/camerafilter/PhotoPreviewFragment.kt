@@ -2,6 +2,7 @@ package com.example.nhatpham.camerafilter
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.content.Intent
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
 import android.net.Uri
@@ -56,7 +57,6 @@ class PhotoPreviewFragment : Fragment() {
                 mBinding.imageView.setFilterWithConfig(selectedConfig)
             }
         })
-        Environment.DIRECTORY_PICTURES
 
         previewImagesAdapter.imageUri = photoUri?.toString() ?: ""
         mBinding.rcImgPreview.adapter = previewImagesAdapter
@@ -98,7 +98,9 @@ class PhotoPreviewFragment : Fragment() {
         mBinding.btnDone.setOnClickListener {
             mBinding.imageView.getResultBitmap { bitmap ->
                 if (bitmap != null && photoUri != null) {
-                    ImageUtil.saveBitmap(bitmap, photoUri.toString())
+                    val filePath = "${getPath()}/${generateImageFileName()}"
+                    ImageUtil.saveBitmap(bitmap, filePath)
+                    activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(filePath))))
                     activity?.supportFragmentManager?.popBackStack()
                 }
             }
@@ -113,7 +115,7 @@ class PhotoPreviewFragment : Fragment() {
                 .load(photoUri)
                 .listener(object : RequestListener<Bitmap> {
                     override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Bitmap>?, isFirstResource: Boolean): Boolean {
-                        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+                        return false
                     }
 
                     override fun onResourceReady(resource: Bitmap?, model: Any?, target: Target<Bitmap>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {

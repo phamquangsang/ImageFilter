@@ -139,7 +139,7 @@ class VideoPreviewFragment : Fragment() {
         }
 
         mBinding.btnDone.setOnClickListener {
-            val outputFileName = "${videoUri.toString().substringBefore(".mp4")}-new.mp4"
+            val outputFileName = "${getPath()}/${generateVideoFileName()}"
             CGEFFmpegNativeLibrary.generateVideoWithFilter(outputFileName, videoUri.toString(), currentConfig, 1.0f, null, CGENativeLibrary.TextureBlendMode.CGE_BLEND_ADDREV, 1.0f, false)
             activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(outputFileName))))
             activity?.supportFragmentManager?.popBackStack()

@@ -7,5 +7,5 @@ class PreviewViewModel : ViewModel() {
 
     val openPhotoPreviewEvent = SingleLiveEvent<Uri>()
     val openVideoPreviewEvent = SingleLiveEvent<Uri>()
-
+    val openGalleryEvent = SingleLiveEvent<Void>()
 }

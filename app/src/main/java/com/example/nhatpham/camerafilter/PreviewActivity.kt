@@ -71,6 +71,12 @@ class PreviewActivity : AppCompatActivity() {
                         .commit()
             }
         })
+        viewModel.openGalleryEvent.observe(this, Observer {
+            supportFragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, GalleryFragment())
+                    .addToBackStack(null)
+                    .commit()
+        })
 
         checkToRequestPermissions()
     }
