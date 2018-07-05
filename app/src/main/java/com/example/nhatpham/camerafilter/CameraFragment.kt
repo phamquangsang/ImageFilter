@@ -2,6 +2,7 @@ package com.example.nhatpham.camerafilter
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.arch.lifecycle.Observer
 import android.arch.lifecycle.ViewModelProviders
 import android.content.Intent
 import android.databinding.DataBindingUtil
@@ -35,14 +36,12 @@ import java.util.concurrent.TimeUnit
 class CameraFragment : Fragment() {
 
     private lateinit var mBinding: FragmentCameraBinding
-    private lateinit var viewModel: PreviewViewModel
+    private lateinit var mainViewModel: MainViewModel
+    private lateinit var cameraViewModel: CameraViewModel
     private lateinit var previewImagesAdapter: PreviewImagesAdapter
     private lateinit var modesAdapter: ModesAdapter
 
-    private var currentConfig: String? = null
     private val mainHandler = Handler()
-    private var isRecording = false
-    private var currentMode = "Photo"
     private var snapHelper = PagerSnapHelper()
     private var scheduler = Executors.newSingleThreadScheduledExecutor()
     private var timeRecordingFuture: ScheduledFuture<*>? = null
@@ -54,12 +53,37 @@ class CameraFragment : Fragment() {
     }
 
     private fun initialize() {
-        viewModel = ViewModelProviders.of(activity!!).get(PreviewViewModel::class.java)
+        mainViewModel = ViewModelProviders.of(activity!!).get(MainViewModel::class.java)
+        cameraViewModel = ViewModelProviders.of(this).get(CameraViewModel::class.java)
+        mBinding.cameraviewmodel = cameraViewModel
+
+        cameraViewModel.showFiltersEvent.observe(viewLifecycleOwner, Observer { active ->
+            showFilters(active ?: false)
+        })
+
+        cameraViewModel.currentModeLiveData.observe(viewLifecycleOwner, Observer {
+            updateModeView(it ?: "Photo")
+        })
+
+        cameraViewModel.currentConfigLiveData.observe(viewLifecycleOwner, Observer { newConfig ->
+            if(newConfig != null) {
+                mBinding.cameraView.setFilterWithConfig(newConfig.value)
+                mBinding.tvFilterName.text = newConfig.name
+                previewImagesAdapter.setNewConfig(newConfig)
+            }
+        })
+
+        cameraViewModel.recordingStateLiveData.observe(viewLifecycleOwner, Observer {
+            val active = it == true
+            mBinding.btnRecord.setImageResource(if (active) R.drawable.stop_recording else R.drawable.start_record)
+            showFilters(active.not())
+            cameraViewModel.isRecording.set(active)
+        })
+
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
-        previewImagesAdapter = PreviewImagesAdapter(context!!, EFFECT_CONFIGS.keys.toList(), object : PreviewImagesAdapter.OnItemInteractListener {
-            override fun onConfigSelected(selectedConfig: String) {
-                currentConfig = selectedConfig
-                mBinding.cameraView.setFilterWithConfig(selectedConfig)
+        previewImagesAdapter = PreviewImagesAdapter(context!!, EFFECT_CONFIGS, object : PreviewImagesAdapter.OnItemInteractListener {
+            override fun onConfigSelected(selectedConfig: Config) {
+                cameraViewModel.currentConfigLiveData.value = selectedConfig
             }
         })
         previewImagesAdapter.imageUri = ""
@@ -69,77 +93,47 @@ class CameraFragment : Fragment() {
         snapHelper.attachToRecyclerView(mBinding.rcModes)
         modesAdapter = ModesAdapter(arrayListOf("Photo", "Video"), object : ModesAdapter.OnItemInteractListener {
             override fun onModeSelected(mode: String, position: Int) {
-                if (isRecording)
-                    return
-                currentMode = mode
-                updateModeDisplay()
+                cameraViewModel.currentModeLiveData.value = mode
                 mBinding.rcModes.smoothScrollToPosition(position)
             }
         })
         mBinding.rcModes.adapter = modesAdapter
         mBinding.rcModes.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrollStateChanged(recyclerView: RecyclerView?, newState: Int) {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                 super.onScrollStateChanged(recyclerView, newState)
-                if (newState != RecyclerView.SCROLL_STATE_IDLE && isRecording)
+                if (newState != RecyclerView.SCROLL_STATE_IDLE)
                     return
-
-                val layoutManager = recyclerView?.layoutManager
+                val layoutManager = recyclerView.layoutManager
                 if (layoutManager is LinearLayoutManager) {
-                    val pos = layoutManager.getPosition(snapHelper.findSnapView(layoutManager))
-                    if (pos != RecyclerView.NO_POSITION) {
-                        currentMode = modesAdapter.getItem(pos)
-                        updateModeDisplay()
+                    val snapView = snapHelper.findSnapView(layoutManager)
+                    if (snapView != null) {
+                        val pos = layoutManager.getPosition(snapView)
+                        if (pos != RecyclerView.NO_POSITION)
+                            cameraViewModel.currentModeLiveData.value = modesAdapter.getItem(pos)
                     }
                 }
             }
         })
 
         mBinding.btnTakePhoto.setOnClickListener {
-            if (!isRecording && currentMode == "Photo") {
-                mBinding.cameraView.takePicture({ bitmap ->
-                    if (bitmap != null) {
-                        val filePath = ImageUtil.saveBitmap(bitmap, "${getPath()}/${generateImageFileName()}")
-                        val fileUri = Uri.fromFile(File(filePath))
-                        bitmap.recycle()
-                        activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, fileUri))
-                        viewModel.openPhotoPreviewEvent.value = fileUri
-                    }
-                }, null, currentConfig, 1.0f, true)
-            }
+            mBinding.cameraView.takePicture({ bitmap ->
+                if (bitmap != null) {
+                    val filePath = ImageUtil.saveBitmap(bitmap, "${getPath()}/${generateImageFileName()}")
+                    bitmap.recycle()
+
+                    val fileUri = Uri.fromFile(File(filePath))
+                    reScanFile(fileUri)
+                    mainViewModel.openPhotoPreviewEvent.value = fileUri
+                }
+            }, null, cameraViewModel.currentConfigLiveData.value?.value ?: DEFAULT_CONFIG.value, 1.0f, true)
         }
         mBinding.btnRecord.setOnClickListener(RecordListener())
 
         mBinding.btnPickFilters.setOnClickListener {
-            if (!mBinding.rcImgPreview.isVisible) {
-                mBinding.rcImgPreview.animate()
-                        .alpha(1F)
-                        .setDuration(resources.getInteger(android.R.integer.config_shortAnimTime).toLong())
-                        .setInterpolator(AccelerateDecelerateInterpolator())
-                        .setListener(object : AnimatorListenerAdapter() {
-                            override fun onAnimationStart(animation: Animator?) {
-                                mBinding.rcImgPreview.animate().setListener(null)
-                                mBinding.rcImgPreview.alpha = 0.6F
-                                mBinding.rcImgPreview.isVisible = true
-                            }
-                        })
-                        .start()
-                mBinding.btnPickFilters.isSelected = true
-            } else {
-                mBinding.rcImgPreview.animate()
-                        .alpha(0F)
-                        .setDuration(resources.getInteger(android.R.integer.config_shortAnimTime).toLong())
-                        .setInterpolator(AccelerateDecelerateInterpolator())
-                        .setListener(object : AnimatorListenerAdapter() {
-                            override fun onAnimationEnd(animation: Animator?) {
-                                mBinding.rcImgPreview.animate().setListener(null)
-                                mBinding.rcImgPreview.isVisible = false
-                            }
-                        }).start()
-                mBinding.btnPickFilters.isSelected = false
-            }
+            cameraViewModel.showFiltersEvent.value = cameraViewModel.showFiltersEvent.value?.not() ?: true
         }
         mBinding.btnGallery.setOnClickListener {
-            viewModel.openGalleryEvent.call()
+            mainViewModel.openGalleryEvent.call()
         }
 
         mBinding.btnBack.setOnClickListener {
@@ -157,8 +151,8 @@ class CameraFragment : Fragment() {
         }
     }
 
-    private fun updateModeDisplay() {
-        when (currentMode) {
+    private fun updateModeView(newMode: String) {
+        when (newMode) {
             "Photo" -> {
                 mBinding.btnTakePhoto.isVisible = true
                 mBinding.btnRecord.isVisible = false
@@ -170,8 +164,58 @@ class CameraFragment : Fragment() {
         }
     }
 
-    private fun updateRecordingDisplay() {
-        mBinding.btnRecord.setImageResource(if (isRecording) R.drawable.stop_recording else R.drawable.start_record)
+    private fun showFilters(visible: Boolean) {
+        val duration = resources.getInteger(android.R.integer.config_shortAnimTime).toLong()
+
+        if (visible) {
+            mBinding.rcImgPreview.post {
+                mBinding.rcImgPreview.alpha = 0.6F
+                mBinding.rcImgPreview.isVisible = true
+            }
+            mBinding.rcImgPreview.post {
+                mBinding.rcImgPreview.animate()
+                        .alpha(1F)
+                        .setDuration(duration)
+                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .start()
+            }
+            mBinding.tvFilterName.post {
+                mBinding.tvFilterName.alpha = 0.6F
+                mBinding.tvFilterName.text = cameraViewModel.currentConfigLiveData.value?.name
+                mBinding.tvFilterName.isVisible = true
+            }
+            mBinding.tvFilterName.post {
+                mBinding.tvFilterName.animate()
+                        .alpha(1F)
+                        .setDuration(duration)
+                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .start()
+            }
+            mBinding.btnPickFilters.isSelected = true
+        } else {
+            mBinding.rcImgPreview.animate()
+                    .alpha(0F)
+                    .setDuration(duration)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator?) {
+                            mBinding.rcImgPreview.animate().setListener(null)
+                            mBinding.rcImgPreview.isVisible = false
+                        }
+                    }).start()
+            mBinding.tvFilterName.animate()
+                    .alpha(0F)
+                    .setDuration(duration)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator?) {
+                            mBinding.tvFilterName.animate().setListener(null)
+                            mBinding.tvFilterName.isVisible = false
+                        }
+                    })
+                    .start()
+            mBinding.btnPickFilters.isSelected = false
+        }
     }
 
     private fun scheduleRecordTime() {
@@ -192,7 +236,9 @@ class CameraFragment : Fragment() {
     override fun onPause() {
         super.onPause()
         CameraInstance.getInstance().stopCamera()
-        mBinding.cameraView.release(null)
+        mBinding.cameraView.release {
+            cameraViewModel.recordingStateLiveData.postValue(false)
+        }
         mBinding.cameraView.onPause()
     }
 
@@ -212,17 +258,20 @@ class CameraFragment : Fragment() {
     }
 
     private fun onStartRecording() {
-        isRecording = true
-        updateRecordingDisplay()
+        cameraViewModel.recordingStateLiveData.value = true
         scheduleRecordTime()
     }
 
     private fun onFinishRecording(recordedFilePath: String) {
-        context?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(recordedFilePath))))
-        isRecording = false
-        updateRecordingDisplay()
+        val fileUri = Uri.fromFile(File(recordedFilePath))
+        reScanFile(fileUri)
         cancelScheduleRecordTime()
-        viewModel.openVideoPreviewEvent.value = Uri.fromFile(File(recordedFilePath))
+        cameraViewModel.recordingStateLiveData.value = false
+        mainViewModel.openVideoPreviewEvent.value = fileUri
+    }
+
+    private fun reScanFile(fileUri: Uri) {
+        context?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, fileUri))
     }
 
     inner class RecordListener : View.OnClickListener {

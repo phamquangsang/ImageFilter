@@ -18,7 +18,7 @@ import kotlin.collections.ArrayList
 class GalleryFragment : Fragment() {
 
     private lateinit var mBinding: FragmentGalleryBinding
-    private lateinit var viewModel: PreviewViewModel
+    private lateinit var mainViewModel: MainViewModel
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_gallery, container, false)
@@ -27,7 +27,7 @@ class GalleryFragment : Fragment() {
     }
 
     private fun initialize() {
-        viewModel = ViewModelProviders.of(activity!!).get(PreviewViewModel::class.java)
+        mainViewModel = ViewModelProviders.of(activity!!).get(MainViewModel::class.java)
 
         mBinding.rcImages.layoutManager = GridLayoutManager(context, 3, GridLayoutManager.VERTICAL, false)
         mBinding.rcImages.addItemDecoration(SpacesItemDecoration(resources.getDimensionPixelSize(R.dimen.gallery_space_item_size)))
@@ -40,9 +40,9 @@ class GalleryFragment : Fragment() {
         mBinding.rcImages.adapter = ImagesAdapter(thumbnails, object : ImagesAdapter.OnItemInteractListener {
             override fun onThumbnailSelected(thumbnail: Thumbnail) {
                 if (thumbnail.isVideo)
-                    viewModel.openVideoPreviewEvent.value = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, thumbnail.id)
+                    mainViewModel.openVideoPreviewEvent.value = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, thumbnail.id)
                 else
-                    viewModel.openPhotoPreviewEvent.value = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, thumbnail.id)
+                    mainViewModel.openPhotoPreviewEvent.value = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, thumbnail.id)
             }
         })
         mBinding.btnBack.setOnClickListener {

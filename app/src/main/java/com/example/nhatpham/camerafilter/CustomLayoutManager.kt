@@ -26,11 +26,13 @@ class CustomLayoutManager: LinearLayoutManager {
             val s1 = 1f - mShrinkAmount
             for (i in 0 until childCount) {
                 val child = getChildAt(i)
-                val childMidpoint = (getDecoratedBottom(child) + getDecoratedTop(child)) / 2f
-                val d = Math.min(d1, Math.abs(midpoint - childMidpoint))
-                val scale = s0 + (s1 - s0) * (d - d0) / (d1 - d0)
-                child.scaleX = scale
-                child.scaleY = scale
+                if(child != null) {
+                    val childMidpoint = (getDecoratedBottom(child) + getDecoratedTop(child)) / 2f
+                    val d = Math.min(d1, Math.abs(midpoint - childMidpoint))
+                    val scale = s0 + (s1 - s0) * (d - d0) / (d1 - d0)
+                    child.scaleX = scale
+                    child.scaleY = scale
+                }
             }
             return scrolled
         } else {
@@ -50,11 +52,13 @@ class CustomLayoutManager: LinearLayoutManager {
             val s1 = 1f - mShrinkAmount
             for (i in 0 until childCount) {
                 val child = getChildAt(i)
-                val childMidpoint = (getDecoratedRight(child) + getDecoratedLeft(child)) / 2f
-                val d = Math.min(d1, Math.abs(midpoint - childMidpoint))
-                val scale = s0 + (s1 - s0) * (d - d0) / (d1 - d0)
-                child.scaleX = scale
-                child.scaleY = scale
+                if(child != null) {
+                    val childMidpoint = (getDecoratedRight(child) + getDecoratedLeft(child)) / 2f
+                    val d = Math.min(d1, Math.abs(midpoint - childMidpoint))
+                    val scale = s0 + (s1 - s0) * (d - d0) / (d1 - d0)
+                    child.scaleX = scale
+                    child.scaleY = scale
+                }
             }
             return scrolled
         } else {

@@ -35,7 +35,7 @@ import kotlin.collections.ArrayList
 class MainActivity : AppCompatActivity() {
 
     lateinit var mBinding: ActivityMainBinding
-    lateinit var previewImagesAdapter: PreviewImagesAdapter
+    internal lateinit var previewImagesAdapter: PreviewImagesAdapter
     lateinit var selectedPhotoUri: String
     private var mBitmap: Bitmap? = null
     private var mCurrentConfig: String? = null

@@ -2,12 +2,12 @@ package com.example.nhatpham.camerafilter
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.arch.lifecycle.ViewModelProviders
 import android.content.Intent
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 import android.support.v4.app.Fragment
 import android.support.v7.widget.LinearLayoutManager
 import android.view.LayoutInflater
@@ -33,9 +33,10 @@ class PhotoPreviewFragment : Fragment() {
         arguments?.getParcelable(EXTRA_PHOTO_URI) as? Uri
     }
 
+    private lateinit var mainViewModel: MainViewModel
     private lateinit var previewImagesAdapter: PreviewImagesAdapter
     private var currentBitmap: Bitmap? = null
-    private var currentConfig: String? = null
+    private var currentConfig: Config? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_photo_preview, container, false)
@@ -44,21 +45,23 @@ class PhotoPreviewFragment : Fragment() {
     }
 
     private fun initialize() {
+        mainViewModel = ViewModelProviders.of(activity!!).get(MainViewModel::class.java)
+
         mBinding.imageView.displayMode = ImageGLSurfaceView.DisplayMode.DISPLAY_ASPECT_FILL
         mBinding.imageView.setSurfaceCreatedCallback {
             mBinding.imageView.setImageBitmap(currentBitmap)
-            mBinding.imageView.setFilterWithConfig(currentConfig)
+            mBinding.imageView.setFilterWithConfig(currentConfig?.value)
         }
 
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
-        previewImagesAdapter = PreviewImagesAdapter(context!!, EFFECT_CONFIGS.keys.toList(), object : PreviewImagesAdapter.OnItemInteractListener {
-            override fun onConfigSelected(selectedConfig: String) {
+        previewImagesAdapter = PreviewImagesAdapter(context!!, EFFECT_CONFIGS, object : PreviewImagesAdapter.OnItemInteractListener {
+            override fun onConfigSelected(selectedConfig: Config) {
                 currentConfig = selectedConfig
-                mBinding.imageView.setFilterWithConfig(selectedConfig)
+                mBinding.imageView.setFilterWithConfig(selectedConfig.value)
             }
         })
 
-        previewImagesAdapter.imageUri = photoUri?.toString() ?: ""
+        previewImagesAdapter.imageUri = ""
         mBinding.rcImgPreview.adapter = previewImagesAdapter
 
         mBinding.btnPickStickers.setOnClickListener {
@@ -97,11 +100,27 @@ class PhotoPreviewFragment : Fragment() {
 
         mBinding.btnDone.setOnClickListener {
             mBinding.imageView.getResultBitmap { bitmap ->
-                if (bitmap != null && photoUri != null) {
-                    val filePath = "${getPath()}/${generateImageFileName()}"
-                    ImageUtil.saveBitmap(bitmap, filePath)
-                    activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(filePath))))
-                    activity?.supportFragmentManager?.popBackStack()
+                if (bitmap != null) {
+                    if (isMediaStoreImageUri(photoUri)) {
+                        if (currentConfig != null) {
+                            val filePath = "${getPath()}/${generateImageFileName()}"
+                            ImageUtil.saveBitmap(bitmap, filePath)
+                            activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(filePath))))
+                        } else {
+                            mainViewModel.doneEditEvent.value = photoUri
+                        }
+                    } else if(isFileUri(photoUri)){
+                        if (currentConfig != null) {
+                            ImageUtil.saveBitmap(bitmap, photoUri!!.path)
+                            activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, photoUri!!))
+                        } else {
+                            mainViewModel.doneEditEvent.value = photoUri
+                        }
+                    } else {
+                        mainViewModel.doneEditEvent.value = null
+                    }
+                } else {
+                    mainViewModel.doneEditEvent.value = null
                 }
             }
         }
@@ -120,7 +139,7 @@ class PhotoPreviewFragment : Fragment() {
 
                     override fun onResourceReady(resource: Bitmap?, model: Any?, target: Target<Bitmap>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
                         currentBitmap = resource
-                        mBinding.imageView.setFilterWithConfig(currentConfig)
+                        mBinding.imageView.setFilterWithConfig(currentConfig?.value)
                         mBinding.imageView.setImageBitmap(currentBitmap)
                         return false
                     }

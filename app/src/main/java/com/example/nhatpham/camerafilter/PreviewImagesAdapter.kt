@@ -20,9 +20,9 @@ import com.example.nhatpham.camerafilter.databinding.LayoutPreviewItemBinding
 import org.wysaid.nativePort.CGENativeLibrary
 import java.util.concurrent.Executors
 
-class PreviewImagesAdapter(private val context: Context,
-                           private val configs: List<String> = emptyList(),
-                           private val onItemInteractListener: PreviewImagesAdapter.OnItemInteractListener?)
+internal class PreviewImagesAdapter(context: Context,
+                                    private val configs: List<Config> = emptyList(),
+                                    private val onItemInteractListener: PreviewImagesAdapter.OnItemInteractListener?)
     : RecyclerView.Adapter<PreviewImagesAdapter.ViewHolder>() {
 
     val appExecutor = Executors.newSingleThreadExecutor()
@@ -34,7 +34,8 @@ class PreviewImagesAdapter(private val context: Context,
     val selectedScale = 1.05F
 
     var imageUri: String? = null
-    var selectedPos: Int = 0
+
+    private var lastSelectedPosition = 0
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PreviewImagesAdapter.ViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.layout_preview_item, parent, false)
@@ -58,6 +59,21 @@ class PreviewImagesAdapter(private val context: Context,
 
     override fun getItemCount() = configs.size
 
+    fun setNewConfig(newConfig: Config) {
+        if (newConfig != configs[lastSelectedPosition]) {
+            val newPos = findConfigPos(newConfig)
+            if (newPos != null) {
+                lastSelectedPosition = newPos
+                notifyItemChanged(newPos, bundleOf("selected" to true))
+            }
+        }
+    }
+
+    private fun findConfigPos(config: Config): Int? {
+        val pos = configs.indexOf(config)
+        return if (pos != -1) pos else null
+    }
+
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
 
         val mBinding: LayoutPreviewItemBinding? = DataBindingUtil.bind(itemView)
@@ -65,14 +81,14 @@ class PreviewImagesAdapter(private val context: Context,
         init {
             itemView.setOnClickListener {
                 val bundle = bundleOf("selected" to true)
-                notifyItemChanged(selectedPos, bundle)
-                selectedPos = adapterPosition
-                notifyItemChanged(selectedPos, bundle)
-                onItemInteractListener?.onConfigSelected(configs[selectedPos])
+                notifyItemChanged(lastSelectedPosition, bundle)
+                lastSelectedPosition = adapterPosition
+                notifyItemChanged(adapterPosition, bundle)
+                onItemInteractListener?.onConfigSelected(configs[adapterPosition])
             }
         }
 
-        fun bindData(config: String) {
+        fun bindData(config: Config) {
             if (!imageUri.isNullOrEmpty()) {
                 Glide.with(itemView.context)
                         .asBitmap()
@@ -83,7 +99,7 @@ class PreviewImagesAdapter(private val context: Context,
                         .into(object : BitmapImageViewTarget(mBinding!!.imgFilter) {
                             override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
                                 appExecutor.submit {
-                                    val result = CGENativeLibrary.filterImage_MultipleEffects(resource, config, 1.0f)
+                                    val result = CGENativeLibrary.filterImage_MultipleEffects(resource, config.value, 1.0f)
                                     mainHandler.post {
                                         getView().setImageBitmap(result)
                                     }
@@ -100,7 +116,7 @@ class PreviewImagesAdapter(private val context: Context,
                         .into(object : BitmapImageViewTarget(mBinding!!.imgFilter) {
                             override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
                                 appExecutor.submit {
-                                    val result = CGENativeLibrary.filterImage_MultipleEffects(resource, config, 1.0f)
+                                    val result = CGENativeLibrary.filterImage_MultipleEffects(resource, config.value, 1.0f)
                                     mainHandler.post {
                                         getView().setImageBitmap(result)
                                     }
@@ -108,19 +124,19 @@ class PreviewImagesAdapter(private val context: Context,
                             }
                         })
             }
-            if(selectedPos == adapterPosition) {
+            if (lastSelectedPosition == adapterPosition) {
                 mBinding.imgFilter.scaleX = selectedScale
                 mBinding.imgFilter.scaleY = selectedScale
             } else {
                 mBinding.imgFilter.scaleX = defaultScale
                 mBinding.imgFilter.scaleY = defaultScale
             }
-            mBinding.imgFilter.borderColor = if (selectedPos == adapterPosition) selectedColor else Color.WHITE
+            mBinding.imgFilter.borderColor = if (lastSelectedPosition == adapterPosition) selectedColor else Color.WHITE
         }
 
-        fun bindData(config: String, payload: Bundle) {
+        fun bindData(config: Config, payload: Bundle) {
             if (payload.getBoolean("selected")) {
-                val amount = if (selectedPos == adapterPosition) selectedScale else defaultScale
+                val amount = if (lastSelectedPosition == adapterPosition) selectedScale else defaultScale
                 mBinding!!.imgFilter.post {
                     mBinding.imgFilter.animate()
                             .scaleX(amount)
@@ -128,13 +144,13 @@ class PreviewImagesAdapter(private val context: Context,
                             .setDuration(100)
                             .start()
                 }
-                mBinding.imgFilter.borderColor = if (selectedPos == adapterPosition) selectedColor else Color.WHITE
+                mBinding.imgFilter.borderColor = if (lastSelectedPosition == adapterPosition) selectedColor else Color.WHITE
             }
         }
     }
 
     interface OnItemInteractListener {
 
-        fun onConfigSelected(selectedConfig: String)
+        fun onConfigSelected(selectedConfig: Config)
     }
 }

@@ -2,6 +2,7 @@ package com.example.nhatpham.camerafilter
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.arch.lifecycle.ViewModelProviders
 import android.content.Intent
 import android.databinding.DataBindingUtil
 import android.media.MediaPlayer
@@ -36,13 +37,15 @@ class VideoPreviewFragment : Fragment() {
         arguments?.getParcelable(EXTRA_VIDEO_URI) as? Uri
     }
 
+    private lateinit var mainViewModel: MainViewModel
     private val mainHandler = Handler()
     private var mediaPlayer: MediaPlayer? = null
-    private var scheduler = Executors.newSingleThreadScheduledExecutor()
+    private var scheduler = Executors.newScheduledThreadPool(2)
     private var timeRecordingFuture : ScheduledFuture<*>? = null
 
+    private val progressDialogFragment = ProgressDialogFragment()
     private lateinit var previewImagesAdapter: PreviewImagesAdapter
-    private var currentConfig: String? = null
+    private var currentConfig: Config? = null
 
     private val playCompletionCallback = object : VideoPlayerGLSurfaceView.PlayCompletionCallback {
         override fun playComplete(player: MediaPlayer) {
@@ -65,11 +68,13 @@ class VideoPreviewFragment : Fragment() {
     }
 
     private fun initialize() {
+        mainViewModel = ViewModelProviders.of(activity!!).get(MainViewModel::class.java)
+
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
-        previewImagesAdapter = PreviewImagesAdapter(context!!, EFFECT_CONFIGS.keys.toList(), object : PreviewImagesAdapter.OnItemInteractListener {
-            override fun onConfigSelected(selectedConfig: String) {
+        previewImagesAdapter = PreviewImagesAdapter(context!!, EFFECT_CONFIGS, object : PreviewImagesAdapter.OnItemInteractListener {
+            override fun onConfigSelected(selectedConfig: Config) {
                 currentConfig = selectedConfig
-                mBinding.videoView.setFilterWithConfig(selectedConfig)
+                mBinding.videoView.setFilterWithConfig(selectedConfig.value)
             }
         })
         mBinding.rcImgPreview.adapter = previewImagesAdapter
@@ -77,7 +82,6 @@ class VideoPreviewFragment : Fragment() {
         mBinding.videoView.setZOrderOnTop(false)
         mBinding.videoView.setZOrderMediaOverlay(true)
         mBinding.videoView.setPlayerInitializeCallback({ player ->
-            //针对网络视频进行进度检查
             player.setOnBufferingUpdateListener { _, percent ->
                 if (percent == 100) {
                     player.setOnBufferingUpdateListener(null)
@@ -135,15 +139,59 @@ class VideoPreviewFragment : Fragment() {
         }
 
         mBinding.btnDone.setOnClickListener {
-            val outputFileName = "${getPath()}/${generateVideoFileName()}"
-            CGEFFmpegNativeLibrary.generateVideoWithFilter(outputFileName, videoUri.toString(), currentConfig, 1.0f, null, CGENativeLibrary.TextureBlendMode.CGE_BLEND_ADDREV, 1.0f, false)
-            activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(outputFileName))))
-            activity?.supportFragmentManager?.popBackStack()
+            if(isMediaStoreVideoUri(videoUri)) {
+                if(currentConfig == null) {
+                    mainViewModel.doneEditEvent.value = videoUri
+                    return@setOnClickListener
+                }
+
+                mediaPlayer?.run {
+                    if(isPlaying)
+                        stop()
+                }
+                progressDialogFragment.show(fragmentManager, ProgressDialogFragment::class.java.simpleName)
+                scheduler.submit {
+                    generateFilteredVideo(currentConfig!!.value)
+                    mainHandler.post {
+                        progressDialogFragment.dismiss()
+                    }
+                    mainViewModel.doneEditEvent.postValue(videoUri)
+                }
+            } else if(isFileUri(videoUri)) {
+                if(!File(videoUri!!.path).exists()) {
+                    mainViewModel.doneEditEvent.value = null
+                    return@setOnClickListener
+                }
+
+                if(currentConfig == null) {
+                    mainViewModel.doneEditEvent.value = videoUri
+                    return@setOnClickListener
+                }
+
+                mediaPlayer?.run {
+                    if(isPlaying)
+                        stop()
+                }
+                progressDialogFragment.show(fragmentManager, ProgressDialogFragment::class.java.simpleName)
+                scheduler.submit {
+                    generateFilteredVideo(currentConfig!!.value)
+                    mainHandler.post {
+                        progressDialogFragment.dismiss()
+                    }
+                    mainViewModel.doneEditEvent.postValue(videoUri)
+                }
+            }
         }
 
         mBinding.btnBack.setOnClickListener {
             activity?.supportFragmentManager?.popBackStack()
         }
+    }
+
+    private fun generateFilteredVideo(config: String) {
+        val outputFileName = "${getPath()}/${generateVideoFileName()}"
+        CGEFFmpegNativeLibrary.generateVideoWithFilter(outputFileName, videoUri.toString(), config, 1.0f, null, CGENativeLibrary.TextureBlendMode.CGE_BLEND_ADDREV, 1.0f, false)
+        activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(outputFileName))))
     }
 
     private fun scheduleRecordTime() {
@@ -185,7 +233,7 @@ class VideoPreviewFragment : Fragment() {
     companion object {
         private const val EXTRA_VIDEO_URI = "EXTRA_VIDEO_URI"
 
-        fun newInstance(videoUri: Uri): VideoPreviewFragment {
+        fun newInstance(videoUri: Uri, config: String = ""): VideoPreviewFragment {
             return VideoPreviewFragment().apply {
                 arguments = Bundle().apply {
                     putParcelable(EXTRA_VIDEO_URI, videoUri)
