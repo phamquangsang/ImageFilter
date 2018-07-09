@@ -1,4 +1,4 @@
-package com.example.nhatpham.camerafilter
+package com.example.nhatpham.camerafilter.preview
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
@@ -22,6 +22,7 @@ import org.wysaid.view.VideoPlayerGLSurfaceView
 import android.os.Handler
 import android.os.SystemClock
 import android.text.format.DateUtils
+import com.example.nhatpham.camerafilter.*
 import org.wysaid.nativePort.CGEFFmpegNativeLibrary
 import org.wysaid.nativePort.CGENativeLibrary
 import java.io.File
@@ -44,7 +45,7 @@ internal class VideoPreviewFragment : Fragment() {
     private var timeRecordingFuture : ScheduledFuture<*>? = null
 
     private val progressDialogFragment = ProgressDialogFragment()
-    private lateinit var previewImagesAdapter: PreviewImagesAdapter
+    private lateinit var previewFiltersAdapter: PreviewFiltersAdapter
     private var currentConfig: Config? = null
 
     private val playCompletionCallback = object : VideoPlayerGLSurfaceView.PlayCompletionCallback {
@@ -71,13 +72,13 @@ internal class VideoPreviewFragment : Fragment() {
         mainViewModel = ViewModelProviders.of(activity!!).get(MainViewModel::class.java)
 
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
-        previewImagesAdapter = PreviewImagesAdapter(context!!, EFFECT_CONFIGS, object : PreviewImagesAdapter.OnItemInteractListener {
+        previewFiltersAdapter = PreviewFiltersAdapter(context!!, EFFECT_CONFIGS, object : PreviewFiltersAdapter.OnItemInteractListener {
             override fun onConfigSelected(selectedConfig: Config) {
                 currentConfig = selectedConfig
                 mBinding.videoView.setFilterWithConfig(selectedConfig.value)
             }
         })
-        mBinding.rcImgPreview.adapter = previewImagesAdapter
+        mBinding.rcImgPreview.adapter = previewFiltersAdapter
 
         mBinding.videoView.setZOrderOnTop(false)
         mBinding.videoView.setZOrderMediaOverlay(true)

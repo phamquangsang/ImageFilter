@@ -20,10 +20,10 @@ import com.example.nhatpham.camerafilter.databinding.LayoutPreviewItemBinding
 import org.wysaid.nativePort.CGENativeLibrary
 import java.util.concurrent.Executors
 
-internal class PreviewImagesAdapter(context: Context,
-                                    private val configs: List<Config> = emptyList(),
-                                    private val onItemInteractListener: PreviewImagesAdapter.OnItemInteractListener?)
-    : RecyclerView.Adapter<PreviewImagesAdapter.ViewHolder>() {
+internal class PreviewFiltersAdapter(context: Context,
+                                     private val configs: List<Config> = emptyList(),
+                                     private val onItemInteractListener: PreviewFiltersAdapter.OnItemInteractListener?)
+    : RecyclerView.Adapter<PreviewFiltersAdapter.ViewHolder>() {
 
     val appExecutor = Executors.newSingleThreadExecutor()
     val mainHandler = Handler()
@@ -37,12 +37,12 @@ internal class PreviewImagesAdapter(context: Context,
 
     private var lastSelectedPosition = 0
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PreviewImagesAdapter.ViewHolder {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PreviewFiltersAdapter.ViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.layout_preview_item, parent, false)
         return ViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: PreviewImagesAdapter.ViewHolder, position: Int) {
+    override fun onBindViewHolder(holder: PreviewFiltersAdapter.ViewHolder, position: Int) {
         holder.bindData(configs[position])
     }
 

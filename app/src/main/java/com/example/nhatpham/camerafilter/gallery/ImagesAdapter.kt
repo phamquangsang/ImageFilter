@@ -1,7 +1,6 @@
-package com.example.nhatpham.camerafilter
+package com.example.nhatpham.camerafilter.gallery
 
 import android.databinding.DataBindingUtil
-import android.os.SystemClock
 import android.support.v7.widget.RecyclerView
 import android.text.format.DateUtils
 import android.view.LayoutInflater
@@ -10,11 +9,12 @@ import android.view.ViewGroup
 import androidx.core.view.isVisible
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
+import com.example.nhatpham.camerafilter.R
 import com.example.nhatpham.camerafilter.databinding.LayoutGalleryItemBinding
 import java.util.concurrent.TimeUnit
 
 internal class ImagesAdapter(private val images: List<GalleryFragment.Thumbnail> = emptyList(),
-                    private var onItemInteractListener: OnItemInteractListener?)
+                             private var onItemInteractListener: OnItemInteractListener?)
     : RecyclerView.Adapter<ImagesAdapter.ViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -30,7 +30,7 @@ internal class ImagesAdapter(private val images: List<GalleryFragment.Thumbnail>
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
 
-        val mBinding = DataBindingUtil.bind<LayoutGalleryItemBinding>(itemView)
+        private val mBinding = DataBindingUtil.bind<LayoutGalleryItemBinding>(itemView)
 
         init {
             mBinding!!.root.setOnClickListener {

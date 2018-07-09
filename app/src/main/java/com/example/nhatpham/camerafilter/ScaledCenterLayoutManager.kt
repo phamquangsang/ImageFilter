@@ -5,15 +5,12 @@ import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 
 
-class CustomLayoutManager: LinearLayoutManager {
+class ScaledCenterLayoutManager: LinearLayoutManager {
 
     private val mShrinkAmount = 0.15f
     private val mShrinkDistance = 0.9f
 
-    constructor(context: Context): super(context)
-
     constructor(context: Context, orientation: Int, reverseLayout: Boolean): super(context, orientation, reverseLayout)
-
 
     override fun scrollVerticallyBy(dy: Int, recycler: RecyclerView.Recycler?, state: RecyclerView.State?): Int {
         val orientation = orientation
@@ -64,6 +61,5 @@ class CustomLayoutManager: LinearLayoutManager {
         } else {
             return 0
         }
-
     }
 }

@@ -7,7 +7,7 @@
 
         <variable
             name="cameraviewmodel"
-            type="com.example.nhatpham.camerafilter.CameraViewModel" />
+            type="com.example.nhatpham.camerafilter.camera.CameraViewModel" />
 
         <import type="android.view.View" />
     </data>

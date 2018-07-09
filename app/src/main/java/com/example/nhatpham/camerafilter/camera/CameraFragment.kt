@@ -1,4 +1,4 @@
-package com.example.nhatpham.camerafilter
+package com.example.nhatpham.camerafilter.camera
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
@@ -15,7 +15,6 @@ import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.PagerSnapHelper
 import android.support.v7.widget.RecyclerView
 import android.text.format.DateUtils
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -23,11 +22,11 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Toast
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
+import com.example.nhatpham.camerafilter.*
 import com.example.nhatpham.camerafilter.databinding.FragmentCameraBinding
 import org.wysaid.camera.CameraInstance
 import org.wysaid.myUtils.FileUtil
 import org.wysaid.myUtils.ImageUtil
-import org.wysaid.view.CameraRecordGLSurfaceView
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
@@ -38,7 +37,7 @@ internal class CameraFragment : Fragment() {
     private lateinit var mBinding: FragmentCameraBinding
     private lateinit var mainViewModel: MainViewModel
     private lateinit var cameraViewModel: CameraViewModel
-    private lateinit var previewImagesAdapter: PreviewImagesAdapter
+    private lateinit var previewFiltersAdapter: PreviewFiltersAdapter
     private lateinit var modesAdapter: ModesAdapter
 
     private val mainHandler = Handler()
@@ -62,14 +61,14 @@ internal class CameraFragment : Fragment() {
         })
 
         cameraViewModel.currentModeLiveData.observe(viewLifecycleOwner, Observer {
-            updateModeView(it ?: "Photo")
+            updateModeView(it ?: CameraMode.Photo)
         })
 
         cameraViewModel.currentConfigLiveData.observe(viewLifecycleOwner, Observer { newConfig ->
             if(newConfig != null) {
                 mBinding.cameraView.setFilterWithConfig(newConfig.value)
                 mBinding.tvFilterName.text = newConfig.name
-                previewImagesAdapter.setNewConfig(newConfig)
+                previewFiltersAdapter.setNewConfig(newConfig)
             }
         })
 
@@ -81,18 +80,18 @@ internal class CameraFragment : Fragment() {
         })
 
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
-        previewImagesAdapter = PreviewImagesAdapter(context!!, EFFECT_CONFIGS, object : PreviewImagesAdapter.OnItemInteractListener {
+        previewFiltersAdapter = PreviewFiltersAdapter(context!!, EFFECT_CONFIGS, object : PreviewFiltersAdapter.OnItemInteractListener {
             override fun onConfigSelected(selectedConfig: Config) {
                 cameraViewModel.currentConfigLiveData.value = selectedConfig
             }
         })
-        previewImagesAdapter.imageUri = ""
-        mBinding.rcImgPreview.adapter = previewImagesAdapter
+        previewFiltersAdapter.imageUri = ""
+        mBinding.rcImgPreview.adapter = previewFiltersAdapter
 
-        mBinding.rcModes.layoutManager = CustomLayoutManager(context!!, LinearLayoutManager.HORIZONTAL, false)
+        mBinding.rcModes.layoutManager = ScaledCenterLayoutManager(context!!, LinearLayoutManager.HORIZONTAL, false)
         snapHelper.attachToRecyclerView(mBinding.rcModes)
-        modesAdapter = ModesAdapter(arrayListOf("Photo", "Video"), object : ModesAdapter.OnItemInteractListener {
-            override fun onModeSelected(mode: String, position: Int) {
+        modesAdapter = ModesAdapter(arrayListOf(CameraMode.Photo, CameraMode.Video), object : ModesAdapter.OnItemInteractListener {
+            override fun onModeSelected(mode: CameraMode, position: Int) {
                 cameraViewModel.currentModeLiveData.value = mode
                 mBinding.rcModes.smoothScrollToPosition(position)
             }
@@ -123,7 +122,7 @@ internal class CameraFragment : Fragment() {
 
                     val fileUri = Uri.fromFile(File(filePath))
                     reScanFile(fileUri)
-                    mainViewModel.openPhotoPreviewEvent.value = fileUri
+                    mainViewModel.openPhotoPreviewFromCameraEvent.value = fileUri
                 }
             }, null, cameraViewModel.currentConfigLiveData.value?.value ?: DEFAULT_CONFIG.value, 1.0f, true)
         }
@@ -151,13 +150,13 @@ internal class CameraFragment : Fragment() {
         }
     }
 
-    private fun updateModeView(newMode: String) {
+    private fun updateModeView(newMode: CameraMode) {
         when (newMode) {
-            "Photo" -> {
+            CameraMode.Photo -> {
                 mBinding.btnTakePhoto.isVisible = true
                 mBinding.btnRecord.isVisible = false
             }
-            "Video" -> {
+            CameraMode.Video -> {
                 mBinding.btnTakePhoto.isInvisible = true
                 mBinding.btnRecord.isVisible = true
             }
@@ -280,18 +279,14 @@ internal class CameraFragment : Fragment() {
         private var recordFilePath: String = ""
 
         override fun onClick(v: View?) {
-            val LOG_TAG = CameraRecordGLSurfaceView.LOG_TAG;
-
             if (!isValid) {
-                Log.e(LOG_TAG, "Please wait for the call...")
                 return
             }
             isValid = false
 
             if (!mBinding.cameraView.isRecording) {
-                Log.i(LOG_TAG, "Start recording...")
                 recordFilePath = "${getPath()}/${generateVideoFileName()}"
-                //                recordFilename = ImageUtil.getPath(CameraDemoActivity.this, false) + "/rec_1.mp4";
+
                 mBinding.cameraView.startRecording(recordFilePath, { success ->
                     if (success) {
                         mainHandler.post { onStartRecording() }
@@ -302,11 +297,8 @@ internal class CameraFragment : Fragment() {
                     isValid = true
                 })
             } else {
-                Log.i(LOG_TAG, "End recording...")
                 mBinding.cameraView.endRecording {
-                    Log.i(LOG_TAG, "End recording OK")
                     isValid = true
-
                     mainHandler.post { onFinishRecording(recordFilePath) }
                 }
             }

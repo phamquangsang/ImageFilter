@@ -1,4 +1,4 @@
-package com.example.nhatpham.camerafilter
+package com.example.nhatpham.camerafilter.preview
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
@@ -21,7 +21,9 @@ import com.bumptech.glide.request.target.Target
 import com.example.nhatpham.camerafilter.databinding.FragmentPhotoPreviewBinding
 import org.wysaid.view.ImageGLSurfaceView
 import android.view.animation.AccelerateDecelerateInterpolator
+import android.webkit.URLUtil
 import androidx.core.view.isVisible
+import com.example.nhatpham.camerafilter.*
 import org.wysaid.myUtils.ImageUtil
 import java.io.File
 
@@ -32,9 +34,15 @@ internal class PhotoPreviewFragment : Fragment() {
     private val photoUri: Uri? by lazy {
         arguments?.getParcelable(EXTRA_PHOTO_URI) as? Uri
     }
+    private val fromCamera: Boolean by lazy {
+        arguments?.getBoolean(EXTRA_FROM_CAMERA) ?: false
+    }
+    private val imagePathToSave by lazy {
+        "${getPath()}/${generateImageFileName()}"
+    }
 
     private lateinit var mainViewModel: MainViewModel
-    private lateinit var previewImagesAdapter: PreviewImagesAdapter
+    private lateinit var previewFiltersAdapter: PreviewFiltersAdapter
     private var currentBitmap: Bitmap? = null
     private var currentConfig: Config? = null
 
@@ -54,15 +62,15 @@ internal class PhotoPreviewFragment : Fragment() {
         }
 
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
-        previewImagesAdapter = PreviewImagesAdapter(context!!, EFFECT_CONFIGS, object : PreviewImagesAdapter.OnItemInteractListener {
+        previewFiltersAdapter = PreviewFiltersAdapter(context!!, EFFECT_CONFIGS, object : PreviewFiltersAdapter.OnItemInteractListener {
             override fun onConfigSelected(selectedConfig: Config) {
                 currentConfig = selectedConfig
                 mBinding.imageView.setFilterWithConfig(selectedConfig.value)
             }
         })
 
-        previewImagesAdapter.imageUri = ""
-        mBinding.rcImgPreview.adapter = previewImagesAdapter
+        previewFiltersAdapter.imageUri = ""
+        mBinding.rcImgPreview.adapter = previewFiltersAdapter
 
         mBinding.btnPickStickers.setOnClickListener {
             mBinding.btnPickStickers.isSelected = !mBinding.btnPickStickers.isSelected
@@ -103,15 +111,14 @@ internal class PhotoPreviewFragment : Fragment() {
                 if (bitmap != null) {
                     if (isMediaStoreImageUri(photoUri)) {
                         if (currentConfig != null) {
-                            val filePath = "${getPath()}/${generateImageFileName()}"
-                            val photoUri = Uri.fromFile(File(filePath))
-                            ImageUtil.saveBitmap(bitmap, filePath)
+                            val photoUri = Uri.fromFile(File(imagePathToSave))
+                            ImageUtil.saveBitmap(bitmap, imagePathToSave)
                             activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, photoUri))
                             mainViewModel.doneEditEvent.postValue(photoUri)
                         } else {
                             mainViewModel.doneEditEvent.postValue(photoUri)
                         }
-                    } else if(isFileUri(photoUri)){
+                    } else if (isFileUri(photoUri)) {
                         if (currentConfig != null) {
                             ImageUtil.saveBitmap(bitmap, photoUri!!.path)
                             activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, photoUri!!))
@@ -119,6 +126,11 @@ internal class PhotoPreviewFragment : Fragment() {
                         } else {
                             mainViewModel.doneEditEvent.postValue(photoUri)
                         }
+                    } else if (URLUtil.isHttpUrl(photoUri.toString()) || URLUtil.isHttpsUrl(photoUri.toString())) {
+                        val photoUri = Uri.fromFile(File(imagePathToSave))
+                        ImageUtil.saveBitmap(bitmap, imagePathToSave)
+                        activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, photoUri))
+                        mainViewModel.doneEditEvent.postValue(photoUri)
                     } else {
                         mainViewModel.doneEditEvent.postValue(null)
                     }
@@ -129,6 +141,14 @@ internal class PhotoPreviewFragment : Fragment() {
         }
 
         mBinding.btnBack.setOnClickListener {
+            if (fromCamera && isFileUri(photoUri)) {
+                File(photoUri!!.path).apply {
+                    if (exists()) {
+                        delete()
+                        activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, photoUri))
+                    }
+                }
+            }
             activity?.supportFragmentManager?.popBackStack()
         }
 
@@ -162,11 +182,13 @@ internal class PhotoPreviewFragment : Fragment() {
 
     companion object {
         private const val EXTRA_PHOTO_URI = "EXTRA_PHOTO_URI"
+        private const val EXTRA_FROM_CAMERA = "EXTRA_FROM_CAMERA"
 
-        fun newInstance(photoUri: Uri): PhotoPreviewFragment {
+        fun newInstance(photoUri: Uri, fromCamera: Boolean): PhotoPreviewFragment {
             return PhotoPreviewFragment().apply {
                 arguments = Bundle().apply {
                     putParcelable(EXTRA_PHOTO_URI, photoUri)
+                    putBoolean(EXTRA_FROM_CAMERA, fromCamera)
                 }
             }
         }

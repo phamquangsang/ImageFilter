@@ -1,4 +1,4 @@
-package com.example.nhatpham.camerafilter
+package com.example.nhatpham.camerafilter.gallery
 
 import android.arch.lifecycle.ViewModelProviders
 import android.content.ContentUris
@@ -11,6 +11,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.provider.MediaStore
 import android.support.v7.widget.GridLayoutManager
+import com.example.nhatpham.camerafilter.MainViewModel
+import com.example.nhatpham.camerafilter.R
+import com.example.nhatpham.camerafilter.SpacesItemDecoration
 import com.example.nhatpham.camerafilter.databinding.FragmentGalleryBinding
 import kotlin.Comparator
 import kotlin.collections.ArrayList

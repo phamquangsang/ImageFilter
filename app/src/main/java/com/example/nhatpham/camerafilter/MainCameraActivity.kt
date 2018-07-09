@@ -15,6 +15,10 @@ import android.os.Bundle
 import android.util.Log
 import android.view.Window
 import android.view.WindowManager
+import com.example.nhatpham.camerafilter.camera.CameraFragment
+import com.example.nhatpham.camerafilter.gallery.GalleryFragment
+import com.example.nhatpham.camerafilter.preview.PhotoPreviewFragment
+import com.example.nhatpham.camerafilter.preview.VideoPreviewFragment
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import org.wysaid.common.Common
@@ -56,10 +60,16 @@ class MainCameraActivity : AppCompatActivity() {
 
         mainViewModel = ViewModelProviders.of(this).get(MainViewModel::class.java)
         mainViewModel.openPhotoPreviewEvent.observe(this, Observer { photoUri ->
-            if(photoUri != null) {
-                showPhotoPreviewFragment(photoUri)
+            if (photoUri != null) {
+                showPhotoPreviewFragment(photoUri, false)
             }
         })
+        mainViewModel.openPhotoPreviewFromCameraEvent.observe(this, Observer { photoUri ->
+            if (photoUri != null) {
+                showPhotoPreviewFragment(photoUri, true)
+            }
+        })
+
         mainViewModel.openVideoPreviewEvent.observe(this, Observer { videoUri ->
             if (videoUri != null) {
                 showVideoPreviewFragment(videoUri)
@@ -82,7 +92,7 @@ class MainCameraActivity : AppCompatActivity() {
             reader.use { bufferedReader ->
                 while (true) {
                     val line = bufferedReader.readLine()
-                    if(line != null) {
+                    if (line != null) {
                         builder.append(line)
                     } else {
                         break
@@ -95,8 +105,8 @@ class MainCameraActivity : AppCompatActivity() {
         }
         if (!checkToRequestPermissions()) {
             if (savedInstanceState == null) {
-                if(intent.hasExtra(EXTRA_PHOTO_URI)) {
-                    showPhotoPreviewFragment(intent.getParcelableExtra(EXTRA_PHOTO_URI))
+                if (intent.hasExtra(EXTRA_PHOTO_URI)) {
+                    showPhotoPreviewFragment(intent.getParcelableExtra(EXTRA_PHOTO_URI), false, false)
                 } else {
                     showCameraFragment()
                 }
@@ -117,17 +127,17 @@ class MainCameraActivity : AppCompatActivity() {
                 .commitAllowingStateLoss()
     }
 
-    private fun showPhotoPreviewFragment(photoUri: Uri) {
+    private fun showPhotoPreviewFragment(photoUri: Uri, fromCamera: Boolean, shouldAddToBackStack: Boolean = true) {
         supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(photoUri))
-                .addToBackStack(null)
+                .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(photoUri, fromCamera))
+                .also { if(shouldAddToBackStack) it.addToBackStack(null) }
                 .commit()
     }
 
-    private fun showVideoPreviewFragment(videoUri: Uri) {
+    private fun showVideoPreviewFragment(videoUri: Uri, shouldAddToBackStack: Boolean = true) {
         supportFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, VideoPreviewFragment.newInstance(videoUri))
-                .addToBackStack(null)
+                .also { if(shouldAddToBackStack) it.addToBackStack(null) }
                 .commit()
     }
 
