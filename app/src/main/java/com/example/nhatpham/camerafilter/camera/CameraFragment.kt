@@ -23,7 +23,7 @@ import android.widget.Toast
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import com.example.nhatpham.camerafilter.*
-import com.example.nhatpham.camerafilter.databinding.FragmentCameraBinding
+import com.example.nhatpham.camerafilter.databinding.FragmentCameraFiltersBinding
 import org.wysaid.camera.CameraInstance
 import org.wysaid.myUtils.FileUtil
 import org.wysaid.myUtils.ImageUtil
@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit
 
 internal class CameraFragment : Fragment() {
 
-    private lateinit var mBinding: FragmentCameraBinding
+    private lateinit var mBinding: FragmentCameraFiltersBinding
     private lateinit var mainViewModel: MainViewModel
     private lateinit var cameraViewModel: CameraViewModel
     private lateinit var previewFiltersAdapter: PreviewFiltersAdapter
@@ -46,7 +46,7 @@ internal class CameraFragment : Fragment() {
     private var timeRecordingFuture: ScheduledFuture<*>? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_camera, container, false)
+        mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_camera_filters, container, false)
         initialize()
         return mBinding.root
     }
