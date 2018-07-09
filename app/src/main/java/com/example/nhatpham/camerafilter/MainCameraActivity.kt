@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
@@ -21,7 +22,7 @@ import org.wysaid.nativePort.CGENativeLibrary
 import java.io.*
 import kotlin.math.absoluteValue
 
-class PreviewActivity : AppCompatActivity() {
+class MainCameraActivity : AppCompatActivity() {
 
     private lateinit var mainViewModel: MainViewModel
     private val cameraFragment by lazy { CameraFragment() }
@@ -55,26 +56,17 @@ class PreviewActivity : AppCompatActivity() {
 
         mainViewModel = ViewModelProviders.of(this).get(MainViewModel::class.java)
         mainViewModel.openPhotoPreviewEvent.observe(this, Observer { photoUri ->
-            if (photoUri != null) {
-                supportFragmentManager.beginTransaction()
-                        .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(photoUri))
-                        .addToBackStack(null)
-                        .commit()
+            if(photoUri != null) {
+                showPhotoPreviewFragment(photoUri)
             }
         })
         mainViewModel.openVideoPreviewEvent.observe(this, Observer { videoUri ->
             if (videoUri != null) {
-                supportFragmentManager.beginTransaction()
-                        .replace(R.id.fragment_container, VideoPreviewFragment.newInstance(videoUri))
-                        .addToBackStack(null)
-                        .commit()
+                showVideoPreviewFragment(videoUri)
             }
         })
         mainViewModel.openGalleryEvent.observe(this, Observer {
-            supportFragmentManager.beginTransaction()
-                    .replace(R.id.fragment_container, GalleryFragment())
-                    .addToBackStack(null)
-                    .commit()
+            showGalleryFragment()
         })
         mainViewModel.doneEditEvent.observe(this, Observer {
             setResult(Activity.RESULT_OK, Intent().apply { data = it })
@@ -103,7 +95,11 @@ class PreviewActivity : AppCompatActivity() {
         }
         if (!checkToRequestPermissions()) {
             if (savedInstanceState == null) {
-                showCameraFragment()
+                if(intent.hasExtra(EXTRA_PHOTO_URI)) {
+                    showPhotoPreviewFragment(intent.getParcelableExtra(EXTRA_PHOTO_URI))
+                } else {
+                    showCameraFragment()
+                }
             }
         }
     }
@@ -112,7 +108,7 @@ class PreviewActivity : AppCompatActivity() {
         val permissions = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO,
                 Manifest.permission.READ_EXTERNAL_STORAGE,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        return requestPermissions(this, REQUEST_USE_CAMERA_PERMISSIONS, *permissions)
+        return requestPermissions(this, REQUEST_PERMISSIONS, *permissions)
     }
 
     private fun showCameraFragment() {
@@ -121,9 +117,30 @@ class PreviewActivity : AppCompatActivity() {
                 .commitAllowingStateLoss()
     }
 
+    private fun showPhotoPreviewFragment(photoUri: Uri) {
+        supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(photoUri))
+                .addToBackStack(null)
+                .commit()
+    }
+
+    private fun showVideoPreviewFragment(videoUri: Uri) {
+        supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, VideoPreviewFragment.newInstance(videoUri))
+                .addToBackStack(null)
+                .commit()
+    }
+
+    private fun showGalleryFragment() {
+        supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, GalleryFragment())
+                .addToBackStack(null)
+                .commit()
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         when (requestCode) {
-            REQUEST_USE_CAMERA_PERMISSIONS -> {
+            REQUEST_PERMISSIONS -> {
                 val somePermissionsNotGranted = grantResults.any { it.absoluteValue != PackageManager.PERMISSION_GRANTED }
                 if (!somePermissionsNotGranted) {
                     showCameraFragment()
@@ -136,11 +153,12 @@ class PreviewActivity : AppCompatActivity() {
     }
 
     companion object {
-        const val REQUEST_USE_CAMERA_PERMISSIONS = 1
+        private const val REQUEST_PERMISSIONS = 1
+        private const val EXTRA_PHOTO_URI = "EXTRA_PHOTO_URI"
 
-        fun newIntent(context: Context, photoUri: String, isVideo: Boolean) = Intent(context, PreviewActivity::class.java)
-                .apply {
-                    putExtra("nhat", photoUri)
+        fun newIntent(context: Context, photoUri: Uri) =
+                Intent(context, MainCameraActivity::class.java).apply {
+                    putExtra(EXTRA_PHOTO_URI, photoUri)
                 }
     }
 }

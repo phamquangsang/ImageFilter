@@ -15,7 +15,7 @@ import com.example.nhatpham.camerafilter.databinding.FragmentGalleryBinding
 import kotlin.Comparator
 import kotlin.collections.ArrayList
 
-class GalleryFragment : Fragment() {
+internal class GalleryFragment : Fragment() {
 
     private lateinit var mBinding: FragmentGalleryBinding
     private lateinit var mainViewModel: MainViewModel

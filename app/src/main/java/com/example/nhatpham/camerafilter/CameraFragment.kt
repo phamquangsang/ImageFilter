@@ -33,7 +33,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
-class CameraFragment : Fragment() {
+internal class CameraFragment : Fragment() {
 
     private lateinit var mBinding: FragmentCameraBinding
     private lateinit var mainViewModel: MainViewModel

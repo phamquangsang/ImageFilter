@@ -26,7 +26,7 @@ import org.wysaid.myUtils.ImageUtil
 import java.io.File
 
 
-class PhotoPreviewFragment : Fragment() {
+internal class PhotoPreviewFragment : Fragment() {
 
     private lateinit var mBinding: FragmentPhotoPreviewBinding
     private val photoUri: Uri? by lazy {
@@ -104,23 +104,26 @@ class PhotoPreviewFragment : Fragment() {
                     if (isMediaStoreImageUri(photoUri)) {
                         if (currentConfig != null) {
                             val filePath = "${getPath()}/${generateImageFileName()}"
+                            val photoUri = Uri.fromFile(File(filePath))
                             ImageUtil.saveBitmap(bitmap, filePath)
-                            activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(filePath))))
+                            activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, photoUri))
+                            mainViewModel.doneEditEvent.postValue(photoUri)
                         } else {
-                            mainViewModel.doneEditEvent.value = photoUri
+                            mainViewModel.doneEditEvent.postValue(photoUri)
                         }
                     } else if(isFileUri(photoUri)){
                         if (currentConfig != null) {
                             ImageUtil.saveBitmap(bitmap, photoUri!!.path)
                             activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, photoUri!!))
+                            mainViewModel.doneEditEvent.postValue(photoUri)
                         } else {
-                            mainViewModel.doneEditEvent.value = photoUri
+                            mainViewModel.doneEditEvent.postValue(photoUri)
                         }
                     } else {
-                        mainViewModel.doneEditEvent.value = null
+                        mainViewModel.doneEditEvent.postValue(null)
                     }
                 } else {
-                    mainViewModel.doneEditEvent.value = null
+                    mainViewModel.doneEditEvent.postValue(null)
                 }
             }
         }

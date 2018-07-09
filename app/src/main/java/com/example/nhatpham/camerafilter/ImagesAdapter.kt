@@ -13,7 +13,7 @@ import com.bumptech.glide.request.RequestOptions
 import com.example.nhatpham.camerafilter.databinding.LayoutGalleryItemBinding
 import java.util.concurrent.TimeUnit
 
-class ImagesAdapter(private val images: List<GalleryFragment.Thumbnail> = emptyList(),
+internal class ImagesAdapter(private val images: List<GalleryFragment.Thumbnail> = emptyList(),
                     private var onItemInteractListener: OnItemInteractListener?)
     : RecyclerView.Adapter<ImagesAdapter.ViewHolder>() {
 

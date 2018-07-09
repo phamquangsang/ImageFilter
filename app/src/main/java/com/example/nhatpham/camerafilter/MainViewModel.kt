@@ -3,7 +3,7 @@ package com.example.nhatpham.camerafilter
 import android.arch.lifecycle.ViewModel
 import android.net.Uri
 
-class MainViewModel : ViewModel() {
+internal class MainViewModel : ViewModel() {
 
     val openPhotoPreviewEvent = SingleLiveEvent<Uri>()
     val openVideoPreviewEvent = SingleLiveEvent<Uri>()

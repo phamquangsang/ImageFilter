@@ -30,7 +30,7 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
 
-class VideoPreviewFragment : Fragment() {
+internal class VideoPreviewFragment : Fragment() {
 
     private lateinit var mBinding: FragmentVideoPreviewBinding
     private val videoUri: Uri? by lazy {
