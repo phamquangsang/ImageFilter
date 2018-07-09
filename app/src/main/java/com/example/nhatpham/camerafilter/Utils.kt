@@ -3,7 +3,6 @@ package com.example.nhatpham.camerafilter
 import android.app.Activity
 import android.content.ContentResolver
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
@@ -15,17 +14,15 @@ import java.text.SimpleDateFormat
 import java.util.*
 import android.os.Environment
 import android.provider.MediaStore
-import android.support.v4.app.ActivityCompat.startActivityForResult
-import android.support.v4.app.Fragment
 import com.google.gson.annotations.SerializedName
 import java.io.File
 import kotlin.collections.ArrayList
 
 const val APP_NAME = "Mingle"
 
-internal val DEFAULT_CONFIG = Config("None", "")
+internal val NONE_CONFIG = Config("None", "")
 
-internal val EFFECT_CONFIGS = ArrayList<Config>().apply { add(DEFAULT_CONFIG) }
+internal val EFFECT_CONFIGS = ArrayList<Config>().apply { add(NONE_CONFIG) }
 
 internal data class Config(val name: String,
                            @SerializedName("assets_image_name") private val assetFileName: String) {

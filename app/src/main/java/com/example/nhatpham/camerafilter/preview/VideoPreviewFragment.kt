@@ -2,6 +2,7 @@ package com.example.nhatpham.camerafilter.preview
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.arch.lifecycle.Observer
 import android.arch.lifecycle.ViewModelProviders
 import android.content.Intent
 import android.databinding.DataBindingUtil
@@ -39,6 +40,7 @@ internal class VideoPreviewFragment : Fragment() {
     }
 
     private lateinit var mainViewModel: MainViewModel
+    private lateinit var videoPreviewViewModel: PhotoPreviewViewModel
     private val mainHandler = Handler()
     private var mediaPlayer: MediaPlayer? = null
     private var scheduler = Executors.newScheduledThreadPool(2)
@@ -46,7 +48,6 @@ internal class VideoPreviewFragment : Fragment() {
 
     private val progressDialogFragment = ProgressDialogFragment()
     private lateinit var previewFiltersAdapter: PreviewFiltersAdapter
-    private var currentConfig: Config? = null
 
     private val playCompletionCallback = object : VideoPlayerGLSurfaceView.PlayCompletionCallback {
         override fun playComplete(player: MediaPlayer) {
@@ -70,12 +71,24 @@ internal class VideoPreviewFragment : Fragment() {
 
     private fun initialize() {
         mainViewModel = ViewModelProviders.of(activity!!).get(MainViewModel::class.java)
+        videoPreviewViewModel = ViewModelProviders.of(this).get(PhotoPreviewViewModel::class.java)
+
+        videoPreviewViewModel.showFiltersEvent.observe(viewLifecycleOwner, Observer { active ->
+            showFilters(active ?: false)
+        })
+
+        videoPreviewViewModel.currentConfigLiveData.observe(viewLifecycleOwner, Observer { newConfig ->
+            if(newConfig != null) {
+                mBinding.videoView.setFilterWithConfig(newConfig.value)
+                mBinding.tvFilterName.text = newConfig.name
+                previewFiltersAdapter.setNewConfig(newConfig)
+            }
+        })
 
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
         previewFiltersAdapter = PreviewFiltersAdapter(context!!, EFFECT_CONFIGS, object : PreviewFiltersAdapter.OnItemInteractListener {
             override fun onConfigSelected(selectedConfig: Config) {
-                currentConfig = selectedConfig
-                mBinding.videoView.setFilterWithConfig(selectedConfig.value)
+                videoPreviewViewModel.currentConfigLiveData.value = selectedConfig
             }
         })
         mBinding.rcImgPreview.adapter = previewFiltersAdapter
@@ -110,38 +123,13 @@ internal class VideoPreviewFragment : Fragment() {
         }
 
         mBinding.btnPickFilters.setOnClickListener {
-            if (!mBinding.rcImgPreview.isVisible) {
-                mBinding.rcImgPreview.animate()
-                        .alpha(1F)
-                        .setDuration(resources.getInteger(android.R.integer.config_shortAnimTime).toLong())
-                        .setInterpolator(AccelerateDecelerateInterpolator())
-                        .setListener(object : AnimatorListenerAdapter() {
-                            override fun onAnimationStart(animation: Animator?) {
-                                mBinding.rcImgPreview.animate().setListener(null)
-                                mBinding.rcImgPreview.alpha = 0.6F
-                                mBinding.rcImgPreview.isVisible = true
-                            }
-                        })
-                        .start()
-                mBinding.btnPickFilters.isSelected = true
-            } else {
-                mBinding.rcImgPreview.animate()
-                        .alpha(0F)
-                        .setDuration(resources.getInteger(android.R.integer.config_shortAnimTime).toLong())
-                        .setInterpolator(AccelerateDecelerateInterpolator())
-                        .setListener(object : AnimatorListenerAdapter() {
-                            override fun onAnimationEnd(animation: Animator?) {
-                                mBinding.rcImgPreview.animate().setListener(null)
-                                mBinding.rcImgPreview.isVisible = false
-                            }
-                        }).start()
-                mBinding.btnPickFilters.isSelected = false
-            }
+            videoPreviewViewModel.showFiltersEvent.value = videoPreviewViewModel.showFiltersEvent.value?.not() ?: true
         }
 
         mBinding.btnDone.setOnClickListener {
             if(isMediaStoreVideoUri(videoUri)) {
-                if(currentConfig == null) {
+                val currentConfig = videoPreviewViewModel.currentConfigLiveData.value
+                if(currentConfig == null || currentConfig == NONE_CONFIG) {
                     mainViewModel.doneEditEvent.value = videoUri
                     return@setOnClickListener
                 }
@@ -152,7 +140,7 @@ internal class VideoPreviewFragment : Fragment() {
                 }
                 progressDialogFragment.show(fragmentManager, ProgressDialogFragment::class.java.simpleName)
                 scheduler.submit {
-                    generateFilteredVideo(currentConfig!!.value)
+                    generateFilteredVideo(currentConfig.value)
                     mainHandler.post {
                         progressDialogFragment.dismiss()
                     }
@@ -163,8 +151,8 @@ internal class VideoPreviewFragment : Fragment() {
                     mainViewModel.doneEditEvent.value = null
                     return@setOnClickListener
                 }
-
-                if(currentConfig == null) {
+                val currentConfig = videoPreviewViewModel.currentConfigLiveData.value
+                if(currentConfig == null || currentConfig == NONE_CONFIG) {
                     mainViewModel.doneEditEvent.value = videoUri
                     return@setOnClickListener
                 }
@@ -175,7 +163,7 @@ internal class VideoPreviewFragment : Fragment() {
                 }
                 progressDialogFragment.show(fragmentManager, ProgressDialogFragment::class.java.simpleName)
                 scheduler.submit {
-                    generateFilteredVideo(currentConfig!!.value)
+                    generateFilteredVideo(currentConfig.value)
                     mainHandler.post {
                         progressDialogFragment.dismiss()
                     }
@@ -208,6 +196,60 @@ internal class VideoPreviewFragment : Fragment() {
     private fun cancelScheduleRecordTime() {
         mBinding.tvRecordingTime.isVisible = false
         timeRecordingFuture?.cancel(false)
+    }
+
+    private fun showFilters(visible: Boolean) {
+        val duration = resources.getInteger(android.R.integer.config_shortAnimTime).toLong()
+
+        if (visible) {
+            mBinding.rcImgPreview.post {
+                mBinding.rcImgPreview.alpha = 0.6F
+                mBinding.rcImgPreview.isVisible = true
+            }
+            mBinding.rcImgPreview.post {
+                mBinding.rcImgPreview.animate()
+                        .alpha(1F)
+                        .setDuration(duration)
+                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .start()
+            }
+            mBinding.tvFilterName.post {
+                mBinding.tvFilterName.alpha = 0.6F
+                mBinding.tvFilterName.text = videoPreviewViewModel.currentConfigLiveData.value?.name
+                mBinding.tvFilterName.isVisible = true
+            }
+            mBinding.tvFilterName.post {
+                mBinding.tvFilterName.animate()
+                        .alpha(1F)
+                        .setDuration(duration)
+                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .start()
+            }
+            mBinding.btnPickFilters.isSelected = true
+        } else {
+            mBinding.rcImgPreview.animate()
+                    .alpha(0F)
+                    .setDuration(duration)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator?) {
+                            mBinding.rcImgPreview.animate().setListener(null)
+                            mBinding.rcImgPreview.isVisible = false
+                        }
+                    }).start()
+            mBinding.tvFilterName.animate()
+                    .alpha(0F)
+                    .setDuration(duration)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator?) {
+                            mBinding.tvFilterName.animate().setListener(null)
+                            mBinding.tvFilterName.isVisible = false
+                        }
+                    })
+                    .start()
+            mBinding.btnPickFilters.isSelected = false
+        }
     }
 
     override fun onResume() {

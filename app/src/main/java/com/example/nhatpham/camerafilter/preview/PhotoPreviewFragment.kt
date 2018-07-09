@@ -2,6 +2,7 @@ package com.example.nhatpham.camerafilter.preview
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.arch.lifecycle.Observer
 import android.arch.lifecycle.ViewModelProviders
 import android.content.Intent
 import android.databinding.DataBindingUtil
@@ -42,9 +43,9 @@ internal class PhotoPreviewFragment : Fragment() {
     }
 
     private lateinit var mainViewModel: MainViewModel
+    private lateinit var photoPreviewViewModel: PhotoPreviewViewModel
     private lateinit var previewFiltersAdapter: PreviewFiltersAdapter
     private var currentBitmap: Bitmap? = null
-    private var currentConfig: Config? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_photo_preview, container, false)
@@ -54,18 +55,30 @@ internal class PhotoPreviewFragment : Fragment() {
 
     private fun initialize() {
         mainViewModel = ViewModelProviders.of(activity!!).get(MainViewModel::class.java)
+        photoPreviewViewModel = ViewModelProviders.of(this).get(PhotoPreviewViewModel::class.java)
+
+        photoPreviewViewModel.showFiltersEvent.observe(viewLifecycleOwner, Observer { active ->
+            showFilters(active ?: false)
+        })
+
+        photoPreviewViewModel.currentConfigLiveData.observe(viewLifecycleOwner, Observer { newConfig ->
+            if(newConfig != null) {
+                mBinding.imageView.setFilterWithConfig(newConfig.value)
+                mBinding.tvFilterName.text = newConfig.name
+                previewFiltersAdapter.setNewConfig(newConfig)
+            }
+        })
 
         mBinding.imageView.displayMode = ImageGLSurfaceView.DisplayMode.DISPLAY_ASPECT_FILL
         mBinding.imageView.setSurfaceCreatedCallback {
             mBinding.imageView.setImageBitmap(currentBitmap)
-            mBinding.imageView.setFilterWithConfig(currentConfig?.value)
+            mBinding.imageView.setFilterWithConfig(photoPreviewViewModel.currentConfigLiveData.value?.value)
         }
 
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
         previewFiltersAdapter = PreviewFiltersAdapter(context!!, EFFECT_CONFIGS, object : PreviewFiltersAdapter.OnItemInteractListener {
             override fun onConfigSelected(selectedConfig: Config) {
-                currentConfig = selectedConfig
-                mBinding.imageView.setFilterWithConfig(selectedConfig.value)
+                photoPreviewViewModel.currentConfigLiveData.value = selectedConfig
             }
         })
 
@@ -77,40 +90,15 @@ internal class PhotoPreviewFragment : Fragment() {
         }
 
         mBinding.btnPickFilters.setOnClickListener {
-            if (!mBinding.rcImgPreview.isVisible) {
-                mBinding.rcImgPreview.animate()
-                        .alpha(1F)
-                        .setDuration(resources.getInteger(android.R.integer.config_shortAnimTime).toLong())
-                        .setInterpolator(AccelerateDecelerateInterpolator())
-                        .setListener(object : AnimatorListenerAdapter() {
-                            override fun onAnimationStart(animation: Animator?) {
-                                mBinding.rcImgPreview.animate().setListener(null)
-                                mBinding.rcImgPreview.alpha = 0.6F
-                                mBinding.rcImgPreview.isVisible = true
-                            }
-                        })
-                        .start()
-                mBinding.btnPickFilters.isSelected = true
-            } else {
-                mBinding.rcImgPreview.animate()
-                        .alpha(0F)
-                        .setDuration(resources.getInteger(android.R.integer.config_shortAnimTime).toLong())
-                        .setInterpolator(AccelerateDecelerateInterpolator())
-                        .setListener(object : AnimatorListenerAdapter() {
-                            override fun onAnimationEnd(animation: Animator?) {
-                                mBinding.rcImgPreview.animate().setListener(null)
-                                mBinding.rcImgPreview.isVisible = false
-                            }
-                        }).start()
-                mBinding.btnPickFilters.isSelected = false
-            }
+            photoPreviewViewModel.showFiltersEvent.value = photoPreviewViewModel.showFiltersEvent.value?.not() ?: true
         }
 
         mBinding.btnDone.setOnClickListener {
             mBinding.imageView.getResultBitmap { bitmap ->
                 if (bitmap != null) {
                     if (isMediaStoreImageUri(photoUri)) {
-                        if (currentConfig != null) {
+                        val currentConfig = photoPreviewViewModel.currentConfigLiveData.value
+                        if (currentConfig != null && currentConfig != NONE_CONFIG) {
                             val photoUri = Uri.fromFile(File(imagePathToSave))
                             ImageUtil.saveBitmap(bitmap, imagePathToSave)
                             activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, photoUri))
@@ -119,7 +107,8 @@ internal class PhotoPreviewFragment : Fragment() {
                             mainViewModel.doneEditEvent.postValue(photoUri)
                         }
                     } else if (isFileUri(photoUri)) {
-                        if (currentConfig != null) {
+                        val currentConfig = photoPreviewViewModel.currentConfigLiveData.value
+                        if (currentConfig != null && currentConfig != NONE_CONFIG) {
                             ImageUtil.saveBitmap(bitmap, photoUri!!.path)
                             activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, photoUri!!))
                             mainViewModel.doneEditEvent.postValue(photoUri)
@@ -162,11 +151,65 @@ internal class PhotoPreviewFragment : Fragment() {
 
                     override fun onResourceReady(resource: Bitmap?, model: Any?, target: Target<Bitmap>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
                         currentBitmap = resource
-                        mBinding.imageView.setFilterWithConfig(currentConfig?.value)
+                        mBinding.imageView.setFilterWithConfig(photoPreviewViewModel.currentConfigLiveData.value?.value)
                         mBinding.imageView.setImageBitmap(currentBitmap)
                         return false
                     }
                 }).submit()
+    }
+
+    private fun showFilters(visible: Boolean) {
+        val duration = resources.getInteger(android.R.integer.config_shortAnimTime).toLong()
+
+        if (visible) {
+            mBinding.rcImgPreview.post {
+                mBinding.rcImgPreview.alpha = 0.6F
+                mBinding.rcImgPreview.isVisible = true
+            }
+            mBinding.rcImgPreview.post {
+                mBinding.rcImgPreview.animate()
+                        .alpha(1F)
+                        .setDuration(duration)
+                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .start()
+            }
+            mBinding.tvFilterName.post {
+                mBinding.tvFilterName.alpha = 0.6F
+                mBinding.tvFilterName.text = photoPreviewViewModel.currentConfigLiveData.value?.name
+                mBinding.tvFilterName.isVisible = true
+            }
+            mBinding.tvFilterName.post {
+                mBinding.tvFilterName.animate()
+                        .alpha(1F)
+                        .setDuration(duration)
+                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .start()
+            }
+            mBinding.btnPickFilters.isSelected = true
+        } else {
+            mBinding.rcImgPreview.animate()
+                    .alpha(0F)
+                    .setDuration(duration)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator?) {
+                            mBinding.rcImgPreview.animate().setListener(null)
+                            mBinding.rcImgPreview.isVisible = false
+                        }
+                    }).start()
+            mBinding.tvFilterName.animate()
+                    .alpha(0F)
+                    .setDuration(duration)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator?) {
+                            mBinding.tvFilterName.animate().setListener(null)
+                            mBinding.tvFilterName.isVisible = false
+                        }
+                    })
+                    .start()
+            mBinding.btnPickFilters.isSelected = false
+        }
     }
 
     override fun onPause() {

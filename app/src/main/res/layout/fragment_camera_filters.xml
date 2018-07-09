@@ -124,8 +124,9 @@
 
         <ImageView
             android:id="@+id/btnGallery"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:scaleType="centerInside"
             android:src="@drawable/gallery"
             android:visibility="@{cameraviewmodel.isRecording ? View.INVISIBLE : View.VISIBLE}"
             app:layout_constraintBottom_toBottomOf="@+id/btnTakePhoto"
@@ -165,8 +166,9 @@
 
         <ImageView
             android:id="@+id/btnPickFilters"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:scaleType="centerInside"
             android:src="@drawable/filter_state"
             android:visibility="@{cameraviewmodel.isRecording ? View.INVISIBLE : View.VISIBLE}"
             app:layout_constraintBottom_toBottomOf="@+id/btnTakePhoto"

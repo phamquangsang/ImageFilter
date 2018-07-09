@@ -75,8 +75,11 @@ internal class CameraFragment : Fragment() {
         cameraViewModel.recordingStateLiveData.observe(viewLifecycleOwner, Observer {
             val active = it == true
             mBinding.btnRecord.setImageResource(if (active) R.drawable.stop_recording else R.drawable.start_record)
-            showFilters(active.not())
             cameraViewModel.isRecording.set(active)
+            if(active)
+                showFilters(false)
+            else
+                cameraViewModel.showFiltersEvent.value = cameraViewModel.showFiltersEvent.value
         })
 
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
@@ -124,7 +127,7 @@ internal class CameraFragment : Fragment() {
                     reScanFile(fileUri)
                     mainViewModel.openPhotoPreviewFromCameraEvent.value = fileUri
                 }
-            }, null, cameraViewModel.currentConfigLiveData.value?.value ?: DEFAULT_CONFIG.value, 1.0f, true)
+            }, null, cameraViewModel.currentConfigLiveData.value?.value ?: NONE_CONFIG.value, 1.0f, true)
         }
         mBinding.btnRecord.setOnClickListener(RecordListener())
 
@@ -166,7 +169,7 @@ internal class CameraFragment : Fragment() {
     private fun showFilters(visible: Boolean) {
         val duration = resources.getInteger(android.R.integer.config_shortAnimTime).toLong()
 
-        if (visible) {
+        if (visible && !mBinding.rcImgPreview.isVisible) {
             mBinding.rcImgPreview.post {
                 mBinding.rcImgPreview.alpha = 0.6F
                 mBinding.rcImgPreview.isVisible = true
@@ -191,7 +194,7 @@ internal class CameraFragment : Fragment() {
                         .start()
             }
             mBinding.btnPickFilters.isSelected = true
-        } else {
+        } else if(!visible && mBinding.rcImgPreview.isVisible){
             mBinding.rcImgPreview.animate()
                     .alpha(0F)
                     .setDuration(duration)

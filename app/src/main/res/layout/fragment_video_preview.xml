@@ -92,19 +92,40 @@
             android:paddingEnd="1dp"
             android:paddingRight="1dp"
             android:paddingBottom="1dp"
-            android:visibility="gone"
+            android:visibility="invisible"
             app:layout_constraintBottom_toBottomOf="@+id/videoView"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintStart_toStartOf="parent" />
 
-        <ImageView
-            android:id="@+id/btnPickStickers"
+        <TextView
+            android:id="@+id/tvFilterName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:shadowColor="#CC222222"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="2"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:layout_constraintBottom_toTopOf="@+id/rcImgPreview"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            tools:text="A1" />
+
+        <ImageView
+            android:id="@+id/btnPickStickers"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
             android:layout_marginTop="20dp"
             android:layout_marginBottom="20dp"
+            android:scaleType="centerInside"
             android:src="@drawable/sticker_state"
             android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
@@ -131,8 +152,9 @@
 
         <ImageView
             android:id="@+id/btnPickFilters"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:scaleType="centerInside"
             android:src="@drawable/filter_state"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
