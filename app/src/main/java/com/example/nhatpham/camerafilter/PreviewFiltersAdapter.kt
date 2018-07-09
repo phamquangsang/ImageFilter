@@ -12,21 +12,21 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.os.bundleOf
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool
+import com.bumptech.glide.load.resource.bitmap.BitmapTransformation
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.BitmapImageViewTarget
 import com.bumptech.glide.request.transition.Transition
 import com.example.nhatpham.camerafilter.databinding.LayoutPreviewItemBinding
 
 import org.wysaid.nativePort.CGENativeLibrary
+import java.security.MessageDigest
 import java.util.concurrent.Executors
 
 internal class PreviewFiltersAdapter(context: Context,
                                      private val configs: List<Config> = emptyList(),
                                      private val onItemInteractListener: PreviewFiltersAdapter.OnItemInteractListener?)
     : RecyclerView.Adapter<PreviewFiltersAdapter.ViewHolder>() {
-
-    val appExecutor = Executors.newSingleThreadExecutor()
-    val mainHandler = Handler()
 
     val previewSize = convertDpToPixel(context, 40F)
     val selectedColor = Color.parseColor("#FF7A79")
@@ -96,16 +96,17 @@ internal class PreviewFiltersAdapter(context: Context,
                         .apply(RequestOptions.encodeQualityOf(75))
                         .apply(RequestOptions.overrideOf(previewSize))
                         .apply(RequestOptions.centerInsideTransform())
-                        .into(object : BitmapImageViewTarget(mBinding!!.imgFilter) {
-                            override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-                                appExecutor.submit {
-                                    val result = CGENativeLibrary.filterImage_MultipleEffects(resource, config.value, 1.0f)
-                                    mainHandler.post {
-                                        getView().setImageBitmap(result)
-                                    }
-                                }
+                        .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
+                            override fun updateDiskCacheKey(messageDigest: MessageDigest) {
+                                messageDigest.update(config.name.toByteArray())
                             }
-                        })
+
+                            override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int): Bitmap {
+                                return CGENativeLibrary.filterImage_MultipleEffects(toTransform, config.value, 1.0f)
+                            }
+
+                        }))
+                        .into(mBinding!!.imgFilter)
             } else {
                 Glide.with(itemView.context)
                         .asBitmap()
@@ -113,16 +114,17 @@ internal class PreviewFiltersAdapter(context: Context,
                         .apply(RequestOptions.encodeQualityOf(75))
                         .apply(RequestOptions.overrideOf(previewSize))
                         .apply(RequestOptions.centerInsideTransform())
-                        .into(object : BitmapImageViewTarget(mBinding!!.imgFilter) {
-                            override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-                                appExecutor.submit {
-                                    val result = CGENativeLibrary.filterImage_MultipleEffects(resource, config.value, 1.0f)
-                                    mainHandler.post {
-                                        getView().setImageBitmap(result)
-                                    }
-                                }
+                        .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
+                            override fun updateDiskCacheKey(messageDigest: MessageDigest) {
+                                messageDigest.update(config.name.toByteArray())
                             }
-                        })
+
+                            override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int): Bitmap {
+                                return CGENativeLibrary.filterImage_MultipleEffects(toTransform, config.value, 1.0f)
+                            }
+
+                        }))
+                        .into(mBinding!!.imgFilter)
             }
             if (lastSelectedPosition == adapterPosition) {
                 mBinding.imgFilter.scaleX = selectedScale
