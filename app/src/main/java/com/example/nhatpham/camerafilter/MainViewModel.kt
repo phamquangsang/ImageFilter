@@ -5,8 +5,8 @@ import android.net.Uri
 
 internal class MainViewModel : ViewModel() {
 
-    val openPhotoPreviewEvent = SingleLiveEvent<Uri>()
-    val openPhotoPreviewFromCameraEvent = SingleLiveEvent<Uri>()
+    val openPhotoPreviewEvent = SingleLiveEvent<Photo>()
+    val openPhotoPreviewFromCameraEvent = SingleLiveEvent<Photo>()
     val openVideoPreviewEvent = SingleLiveEvent<Uri>()
     val openGalleryEvent = SingleLiveEvent<Void>()
     val doneEditEvent = SingleLiveEvent<Uri>()

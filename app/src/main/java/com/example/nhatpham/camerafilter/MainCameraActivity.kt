@@ -59,14 +59,14 @@ class MainCameraActivity : AppCompatActivity() {
         }, null)
 
         mainViewModel = ViewModelProviders.of(this).get(MainViewModel::class.java)
-        mainViewModel.openPhotoPreviewEvent.observe(this, Observer { photoUri ->
-            if (photoUri != null) {
-                showPhotoPreviewFragment(photoUri, false)
+        mainViewModel.openPhotoPreviewEvent.observe(this, Observer { photo ->
+            if (photo != null) {
+                showPhotoPreviewFragment(photo, false)
             }
         })
-        mainViewModel.openPhotoPreviewFromCameraEvent.observe(this, Observer { photoUri ->
-            if (photoUri != null) {
-                showPhotoPreviewFragment(photoUri, true)
+        mainViewModel.openPhotoPreviewFromCameraEvent.observe(this, Observer { photo ->
+            if (photo != null) {
+                showPhotoPreviewFragment(photo, true)
             }
         })
 
@@ -99,14 +99,19 @@ class MainCameraActivity : AppCompatActivity() {
                     }
                 }
             }
-            EFFECT_CONFIGS.addAll(Gson().fromJson<ArrayList<Config>>(builder.toString(), object : TypeToken<ArrayList<Config>>() {}.type))
+            EFFECT_CONFIGS.apply {
+                clear()
+                add(NONE_CONFIG)
+                addAll(Gson().fromJson<ArrayList<Config>>(builder.toString(), object : TypeToken<ArrayList<Config>>() {}.type))
+            }
         } catch (e: IOException) {
             Log.e(Common.LOG_TAG, "Can not open file filters.json")
         }
         if (!checkToRequestPermissions()) {
             if (savedInstanceState == null) {
                 if (intent.hasExtra(EXTRA_PHOTO_URI)) {
-                    showPhotoPreviewFragment(intent.getParcelableExtra(EXTRA_PHOTO_URI), false, false)
+                    val photoUri : Uri = intent.getParcelableExtra(EXTRA_PHOTO_URI)
+                    showPhotoPreviewFragment(Photo(photoUri, NONE_CONFIG), false, false)
                 } else {
                     showCameraFragment()
                 }
@@ -127,9 +132,9 @@ class MainCameraActivity : AppCompatActivity() {
                 .commitAllowingStateLoss()
     }
 
-    private fun showPhotoPreviewFragment(photoUri: Uri, fromCamera: Boolean, shouldAddToBackStack: Boolean = true) {
+    private fun showPhotoPreviewFragment(photo: Photo, fromCamera: Boolean, shouldAddToBackStack: Boolean = true) {
         supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(photoUri, fromCamera))
+                .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(photo, fromCamera))
                 .also { if(shouldAddToBackStack) it.addToBackStack(null) }
                 .commit()
     }

@@ -69,7 +69,7 @@ internal class PreviewFiltersAdapter(context: Context,
         }
     }
 
-    private fun findConfigPos(config: Config): Int? {
+    fun findConfigPos(config: Config): Int? {
         val pos = configs.indexOf(config)
         return if (pos != -1) pos else null
     }

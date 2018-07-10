@@ -78,8 +78,7 @@ internal class CameraFragment : Fragment() {
             cameraViewModel.isRecording.set(active)
             if(active)
                 showFilters(false)
-            else
-                cameraViewModel.showFiltersEvent.value = cameraViewModel.showFiltersEvent.value
+            else cameraViewModel.showFiltersEvent.value = cameraViewModel.showFiltersEvent.value
         })
 
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
@@ -124,10 +123,13 @@ internal class CameraFragment : Fragment() {
                     bitmap.recycle()
 
                     val fileUri = Uri.fromFile(File(filePath))
-                    reScanFile(fileUri)
-                    mainViewModel.openPhotoPreviewFromCameraEvent.value = fileUri
+                    context?.let {
+                        reScanFile(it, fileUri)
+                    }
+                    val config = cameraViewModel.currentConfigLiveData.value ?: NONE_CONFIG
+                    mainViewModel.openPhotoPreviewFromCameraEvent.value = Photo(fileUri, config)
                 }
-            }, null, cameraViewModel.currentConfigLiveData.value?.value ?: NONE_CONFIG.value, 1.0f, true)
+            }, null, NONE_CONFIG.value, 1.0f, true)
         }
         mBinding.btnRecord.setOnClickListener(RecordListener())
 
@@ -150,6 +152,9 @@ internal class CameraFragment : Fragment() {
             setPictureSize(2048, 2048, true) // > 4MP
             setZOrderOnTop(false)
             setZOrderMediaOverlay(true)
+            setOnCreateCallback {
+                setFilterWithConfig(cameraViewModel.currentConfigLiveData.value?.value ?: NONE_CONFIG.value)
+            }
         }
     }
 
@@ -266,14 +271,12 @@ internal class CameraFragment : Fragment() {
 
     private fun onFinishRecording(recordedFilePath: String) {
         val fileUri = Uri.fromFile(File(recordedFilePath))
-        reScanFile(fileUri)
+        context?.let {
+            reScanFile(it, fileUri)
+        }
         cancelScheduleRecordTime()
         cameraViewModel.recordingStateLiveData.value = false
         mainViewModel.openVideoPreviewEvent.value = fileUri
-    }
-
-    private fun reScanFile(fileUri: Uri) {
-        context?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, fileUri))
     }
 
     inner class RecordListener : View.OnClickListener {

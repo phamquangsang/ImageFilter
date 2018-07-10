@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v7.widget.LinearLayoutManager
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -27,13 +28,14 @@ import androidx.core.view.isVisible
 import com.example.nhatpham.camerafilter.*
 import org.wysaid.myUtils.ImageUtil
 import java.io.File
+import java.lang.System.exit
 
 
 internal class PhotoPreviewFragment : Fragment() {
 
     private lateinit var mBinding: FragmentPhotoPreviewBinding
-    private val photoUri: Uri? by lazy {
-        arguments?.getParcelable(EXTRA_PHOTO_URI) as? Uri
+    private val photo: Photo? by lazy {
+        arguments?.getParcelable(EXTRA_PHOTO) as? Photo
     }
     private val fromCamera: Boolean by lazy {
         arguments?.getBoolean(EXTRA_FROM_CAMERA) ?: false
@@ -46,6 +48,7 @@ internal class PhotoPreviewFragment : Fragment() {
     private lateinit var photoPreviewViewModel: PhotoPreviewViewModel
     private lateinit var previewFiltersAdapter: PreviewFiltersAdapter
     private var currentBitmap: Bitmap? = null
+    private var isUnusedPhoto = true
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_photo_preview, container, false)
@@ -61,6 +64,7 @@ internal class PhotoPreviewFragment : Fragment() {
             showFilters(active ?: false)
         })
 
+        photoPreviewViewModel.currentConfigLiveData.value = photo?.config ?: NONE_CONFIG
         photoPreviewViewModel.currentConfigLiveData.observe(viewLifecycleOwner, Observer { newConfig ->
             if(newConfig != null) {
                 mBinding.imageView.setFilterWithConfig(newConfig.value)
@@ -78,12 +82,14 @@ internal class PhotoPreviewFragment : Fragment() {
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
         previewFiltersAdapter = PreviewFiltersAdapter(context!!, EFFECT_CONFIGS, object : PreviewFiltersAdapter.OnItemInteractListener {
             override fun onConfigSelected(selectedConfig: Config) {
-                photoPreviewViewModel.currentConfigLiveData.value = selectedConfig
+                if(currentBitmap != null)
+                    photoPreviewViewModel.currentConfigLiveData.value = selectedConfig
             }
         })
-
         previewFiltersAdapter.imageUri = ""
         mBinding.rcImgPreview.adapter = previewFiltersAdapter
+        val pos = previewFiltersAdapter.findConfigPos(photo?.config ?: NONE_CONFIG)
+        mBinding.rcImgPreview.scrollToPosition(pos ?: 0)
 
         mBinding.btnPickStickers.setOnClickListener {
             mBinding.btnPickStickers.isSelected = !mBinding.btnPickStickers.isSelected
@@ -94,32 +100,43 @@ internal class PhotoPreviewFragment : Fragment() {
         }
 
         mBinding.btnDone.setOnClickListener {
+            if(photo == null) {
+                exit()
+                return@setOnClickListener
+            }
+
             mBinding.imageView.getResultBitmap { bitmap ->
                 if (bitmap != null) {
+                    val photoUri = photo!!.uri
                     if (isMediaStoreImageUri(photoUri)) {
                         val currentConfig = photoPreviewViewModel.currentConfigLiveData.value
                         if (currentConfig != null && currentConfig != NONE_CONFIG) {
-                            val photoUri = Uri.fromFile(File(imagePathToSave))
-                            ImageUtil.saveBitmap(bitmap, imagePathToSave)
-                            activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, photoUri))
-                            mainViewModel.doneEditEvent.postValue(photoUri)
+                            Uri.fromFile(File(imagePathToSave)).let {
+                                ImageUtil.saveBitmap(bitmap, it.path)
+                                reScanFile(it)
+                                mainViewModel.doneEditEvent.postValue(it)
+                            }
                         } else {
                             mainViewModel.doneEditEvent.postValue(photoUri)
                         }
+                        isUnusedPhoto = false
                     } else if (isFileUri(photoUri)) {
                         val currentConfig = photoPreviewViewModel.currentConfigLiveData.value
                         if (currentConfig != null && currentConfig != NONE_CONFIG) {
-                            ImageUtil.saveBitmap(bitmap, photoUri!!.path)
-                            activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, photoUri!!))
+                            ImageUtil.saveBitmap(bitmap, photoUri.path)
+                            reScanFile(photoUri)
                             mainViewModel.doneEditEvent.postValue(photoUri)
                         } else {
                             mainViewModel.doneEditEvent.postValue(photoUri)
                         }
+                        isUnusedPhoto = false
                     } else if (URLUtil.isHttpUrl(photoUri.toString()) || URLUtil.isHttpsUrl(photoUri.toString())) {
-                        val photoUri = Uri.fromFile(File(imagePathToSave))
-                        ImageUtil.saveBitmap(bitmap, imagePathToSave)
-                        activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, photoUri))
-                        mainViewModel.doneEditEvent.postValue(photoUri)
+                        Uri.fromFile(File(imagePathToSave)).let {
+                            ImageUtil.saveBitmap(bitmap, it.path)
+                            reScanFile(it)
+                            isUnusedPhoto = false
+                            mainViewModel.doneEditEvent.postValue(it)
+                        }
                     } else {
                         mainViewModel.doneEditEvent.postValue(null)
                     }
@@ -130,20 +147,12 @@ internal class PhotoPreviewFragment : Fragment() {
         }
 
         mBinding.btnBack.setOnClickListener {
-            if (fromCamera && isFileUri(photoUri)) {
-                File(photoUri!!.path).apply {
-                    if (exists()) {
-                        delete()
-                        activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, photoUri))
-                    }
-                }
-            }
-            activity?.supportFragmentManager?.popBackStack()
+            exit()
         }
 
         Glide.with(this)
                 .asBitmap()
-                .load(photoUri)
+                .load(photo?.uri)
                 .listener(object : RequestListener<Bitmap> {
                     override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Bitmap>?, isFirstResource: Boolean): Boolean {
                         return false
@@ -151,7 +160,9 @@ internal class PhotoPreviewFragment : Fragment() {
 
                     override fun onResourceReady(resource: Bitmap?, model: Any?, target: Target<Bitmap>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
                         currentBitmap = resource
-                        mBinding.imageView.setFilterWithConfig(photoPreviewViewModel.currentConfigLiveData.value?.value)
+                        mBinding.imageView.post {
+                            mBinding.imageView.setFilterWithConfig(photoPreviewViewModel.currentConfigLiveData.value?.value)
+                        }
                         mBinding.imageView.setImageBitmap(currentBitmap)
                         return false
                     }
@@ -212,6 +223,16 @@ internal class PhotoPreviewFragment : Fragment() {
         }
     }
 
+    private fun reScanFile(photoUri: Uri) {
+        activity?.let {
+            reScanFile(it, photoUri)
+        }
+    }
+
+    private fun exit() {
+        activity?.supportFragmentManager?.popBackStack()
+    }
+
     override fun onPause() {
         super.onPause()
         mBinding.imageView.release()
@@ -223,14 +244,31 @@ internal class PhotoPreviewFragment : Fragment() {
         mBinding.imageView.onResume()
     }
 
+    override fun onDestroy() {
+        checkToDeleteUnusedPhoto()
+        super.onDestroy()
+    }
+
+    private fun checkToDeleteUnusedPhoto() {
+        val photoUri = photo?.uri
+        if (fromCamera && isFileUri(photoUri) && isUnusedPhoto) {
+            File(photoUri!!.path).apply {
+                if (exists()) {
+                    delete()
+                    reScanFile(photoUri)
+                }
+            }
+        }
+    }
+
     companion object {
-        private const val EXTRA_PHOTO_URI = "EXTRA_PHOTO_URI"
+        private const val EXTRA_PHOTO = "EXTRA_PHOTO"
         private const val EXTRA_FROM_CAMERA = "EXTRA_FROM_CAMERA"
 
-        fun newInstance(photoUri: Uri, fromCamera: Boolean): PhotoPreviewFragment {
+        fun newInstance(photo: Photo, fromCamera: Boolean): PhotoPreviewFragment {
             return PhotoPreviewFragment().apply {
                 arguments = Bundle().apply {
-                    putParcelable(EXTRA_PHOTO_URI, photoUri)
+                    putParcelable(EXTRA_PHOTO, photo)
                     putBoolean(EXTRA_FROM_CAMERA, fromCamera)
                 }
             }

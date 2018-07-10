@@ -11,9 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.provider.MediaStore
 import android.support.v7.widget.GridLayoutManager
-import com.example.nhatpham.camerafilter.MainViewModel
-import com.example.nhatpham.camerafilter.R
-import com.example.nhatpham.camerafilter.SpacesItemDecoration
+import com.example.nhatpham.camerafilter.*
 import com.example.nhatpham.camerafilter.databinding.FragmentGalleryBinding
 import kotlin.Comparator
 import kotlin.collections.ArrayList
@@ -45,7 +43,7 @@ internal class GalleryFragment : Fragment() {
                 if (thumbnail.isVideo)
                     mainViewModel.openVideoPreviewEvent.value = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, thumbnail.id)
                 else
-                    mainViewModel.openPhotoPreviewEvent.value = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, thumbnail.id)
+                    mainViewModel.openPhotoPreviewEvent.value = Photo(ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, thumbnail.id), NONE_CONFIG)
             }
         })
         mBinding.btnBack.setOnClickListener {
