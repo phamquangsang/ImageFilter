@@ -270,13 +270,14 @@ internal class CameraFragment : Fragment() {
     }
 
     private fun onFinishRecording(recordedFilePath: String) {
+        cancelScheduleRecordTime()
+
         val fileUri = Uri.fromFile(File(recordedFilePath))
         context?.let {
             reScanFile(it, fileUri)
         }
-        cancelScheduleRecordTime()
-        cameraViewModel.recordingStateLiveData.value = false
-        mainViewModel.openVideoPreviewEvent.value = fileUri
+        mainViewModel.openVideoPreviewFromCameraEvent.value = Video(fileUri, cameraViewModel.currentConfigLiveData.value ?: NONE_CONFIG)
+        cameraViewModel.recordingStateLiveData.postValue(false)
     }
 
     inner class RecordListener : View.OnClickListener {

@@ -4,8 +4,9 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.arch.lifecycle.Observer
 import android.arch.lifecycle.ViewModelProviders
-import android.content.Intent
 import android.databinding.DataBindingUtil
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
@@ -23,10 +24,25 @@ import org.wysaid.view.VideoPlayerGLSurfaceView
 import android.os.Handler
 import android.os.SystemClock
 import android.text.format.DateUtils
+import androidx.core.graphics.applyCanvas
+import androidx.core.view.isInvisible
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.DecodeFormat
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool
+import com.bumptech.glide.load.resource.bitmap.BitmapTransformation
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.RequestOptions
+import com.bumptech.glide.request.target.BitmapImageViewTarget
+import com.bumptech.glide.request.target.Target
+import com.bumptech.glide.request.transition.Transition
 import com.example.nhatpham.camerafilter.*
 import org.wysaid.nativePort.CGEFFmpegNativeLibrary
 import org.wysaid.nativePort.CGENativeLibrary
+import org.wysaid.view.ImageGLSurfaceView
 import java.io.File
+import java.security.MessageDigest
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -35,10 +51,12 @@ import java.util.concurrent.TimeUnit
 internal class VideoPreviewFragment : Fragment() {
 
     private lateinit var mBinding: FragmentVideoPreviewBinding
-    private val videoUri: Uri? by lazy {
-        arguments?.getParcelable(EXTRA_VIDEO_URI) as? Uri
+    private val video: Video? by lazy {
+        arguments?.getParcelable(EXTRA_VIDEO) as? Video
     }
-
+    private val fromCamera: Boolean by lazy {
+        arguments?.getBoolean(EXTRA_FROM_CAMERA) ?: false
+    }
     private lateinit var mainViewModel: MainViewModel
     private lateinit var videoPreviewViewModel: PhotoPreviewViewModel
     private val mainHandler = Handler()
@@ -48,11 +66,16 @@ internal class VideoPreviewFragment : Fragment() {
 
     private val progressDialogFragment = ProgressDialogFragment()
     private lateinit var previewFiltersAdapter: PreviewFiltersAdapter
+    private var currentBitmap: Bitmap? = null
+    private var isUnusedVideo = true
+    private val currentConfig
+    get() = videoPreviewViewModel.currentConfigLiveData.value ?: NONE_CONFIG
 
     private val playCompletionCallback = object : VideoPlayerGLSurfaceView.PlayCompletionCallback {
         override fun playComplete(player: MediaPlayer) {
             cancelScheduleRecordTime()
-            mBinding.imgVideoThumb.isVisible = true
+            mBinding.videoView.isVisible = false
+            showThumbnail(true)
             mBinding.btnPlay.isVisible = true
             mediaPlayer = player
         }
@@ -77,8 +100,12 @@ internal class VideoPreviewFragment : Fragment() {
             showFilters(active ?: false)
         })
 
+        videoPreviewViewModel.currentConfigLiveData.value = video?.config ?: NONE_CONFIG
         videoPreviewViewModel.currentConfigLiveData.observe(viewLifecycleOwner, Observer { newConfig ->
             if(newConfig != null) {
+                if(mediaPlayer == null || !mediaPlayer!!.isPlaying) {
+                    showThumbnail(true)
+                }
                 mBinding.videoView.setFilterWithConfig(newConfig.value)
                 mBinding.tvFilterName.text = newConfig.name
                 previewFiltersAdapter.setNewConfig(newConfig)
@@ -92,30 +119,41 @@ internal class VideoPreviewFragment : Fragment() {
             }
         })
         mBinding.rcImgPreview.adapter = previewFiltersAdapter
+        val pos = previewFiltersAdapter.findConfigPos(video?.config ?: NONE_CONFIG)
+        mBinding.rcImgPreview.scrollToPosition(pos ?: 0)
 
-        mBinding.videoView.setZOrderOnTop(false)
-        mBinding.videoView.setZOrderMediaOverlay(true)
-        mBinding.videoView.setPlayerInitializeCallback({ player ->
-            player.setOnBufferingUpdateListener { _, percent ->
-                if (percent == 100) {
-                    player.setOnBufferingUpdateListener(null)
+        mBinding.videoView.apply {
+            setZOrderOnTop(false)
+            setPlayerInitializeCallback{ player ->
+                player.setOnBufferingUpdateListener { _, percent ->
+                    if (percent == 100) {
+                        player.setOnBufferingUpdateListener(null)
+                    }
                 }
             }
-        })
+            isVisible = false
+        }
 
-        mBinding.videoView.setVideoUri(videoUri, { player ->
-            mediaPlayer = player
-        }, playCompletionCallback)
-
-        mBinding.imgVideoThumb.setImageBitmap(getThumbnail(context!!, videoUri!!))
+        mBinding.imgVideoThumb.apply {
+            displayMode = ImageGLSurfaceView.DisplayMode.DISPLAY_ASPECT_FILL
+            setSurfaceCreatedCallback {
+                setImageBitmap(currentBitmap)
+                setFilterWithConfig(currentConfig.value)
+            }
+        }
 
         mBinding.btnPlay.setOnClickListener {
-            mediaPlayer?.run {
-                start()
-                mBinding.imgVideoThumb.isVisible = false
-                mBinding.btnPlay.isVisible = false
-                scheduleRecordTime()
+            if(mediaPlayer != null) {
+                mBinding.videoView.isVisible = true
+                startPlayingVideo()
+            } else {
+                mBinding.videoView.isVisible = true
+                mBinding.videoView.setVideoUri(video?.uri, { player ->
+                    mediaPlayer = player
+                    startPlayingVideo()
+                }, playCompletionCallback)
             }
+            mBinding.btnPlay.isVisible = false
         }
 
         mBinding.btnPickStickers.setOnClickListener {
@@ -127,26 +165,40 @@ internal class VideoPreviewFragment : Fragment() {
         }
 
         mBinding.btnDone.setOnClickListener {
+            val videoUri = video?.uri
             if(isMediaStoreVideoUri(videoUri)) {
+                mediaPlayer?.run {
+                    if(isPlaying)
+                        stop()
+                }
+
                 val currentConfig = videoPreviewViewModel.currentConfigLiveData.value
                 if(currentConfig == null || currentConfig == NONE_CONFIG) {
                     mainViewModel.doneEditEvent.value = videoUri
                     return@setOnClickListener
                 }
 
+                progressDialogFragment.show(fragmentManager, ProgressDialogFragment::class.java.simpleName)
+                scheduler.submit {
+                    if(generateFilteredVideo(currentConfig.value)) {
+                        mainHandler.post {
+                            progressDialogFragment.dismiss()
+                            isUnusedVideo = false
+                        }
+                        mainViewModel.doneEditEvent.postValue(videoUri)
+                    } else {
+                        mainHandler.post {
+                            progressDialogFragment.dismiss()
+                        }
+                        mainViewModel.doneEditEvent.postValue(null)
+                    }
+                }
+            } else if(isFileUri(videoUri)) {
                 mediaPlayer?.run {
                     if(isPlaying)
                         stop()
                 }
-                progressDialogFragment.show(fragmentManager, ProgressDialogFragment::class.java.simpleName)
-                scheduler.submit {
-                    generateFilteredVideo(currentConfig.value)
-                    mainHandler.post {
-                        progressDialogFragment.dismiss()
-                    }
-                    mainViewModel.doneEditEvent.postValue(videoUri)
-                }
-            } else if(isFileUri(videoUri)) {
+
                 if(!File(videoUri!!.path).exists()) {
                     mainViewModel.doneEditEvent.value = null
                     return@setOnClickListener
@@ -157,17 +209,20 @@ internal class VideoPreviewFragment : Fragment() {
                     return@setOnClickListener
                 }
 
-                mediaPlayer?.run {
-                    if(isPlaying)
-                        stop()
-                }
                 progressDialogFragment.show(fragmentManager, ProgressDialogFragment::class.java.simpleName)
                 scheduler.submit {
-                    generateFilteredVideo(currentConfig.value)
-                    mainHandler.post {
-                        progressDialogFragment.dismiss()
+                    if(generateFilteredVideo(currentConfig.value)) {
+                        mainHandler.post {
+                            progressDialogFragment.dismiss()
+                            isUnusedVideo = false
+                        }
+                        mainViewModel.doneEditEvent.postValue(videoUri)
+                    } else {
+                        mainHandler.post {
+                            progressDialogFragment.dismiss()
+                        }
+                        mainViewModel.doneEditEvent.postValue(null)
                     }
-                    mainViewModel.doneEditEvent.postValue(videoUri)
                 }
             }
         }
@@ -175,12 +230,69 @@ internal class VideoPreviewFragment : Fragment() {
         mBinding.btnBack.setOnClickListener {
             activity?.supportFragmentManager?.popBackStack()
         }
+
+        showThumbnail(true)
     }
 
-    private fun generateFilteredVideo(config: String) {
+    private fun startPlayingVideo() {
+        mediaPlayer?.run {
+            showThumbnail(false)
+            mBinding.videoView.setFilterWithConfig(currentConfig.value)
+            start()
+            scheduleRecordTime()
+        }
+    }
+
+    private fun showThumbnail(visible: Boolean, config: Config = currentConfig) {
+        if(visible) {
+            mBinding.imgVideoThumb.isVisible = true
+
+            if(currentBitmap == null) {
+                Glide.with(this)
+                        .asBitmap()
+                        .load(video?.uri)
+                        .apply(RequestOptions.skipMemoryCacheOf(true))
+                        .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
+                            override fun updateDiskCacheKey(messageDigest: MessageDigest) {
+                                val videoUri = video?.uri
+                                if(videoUri != null) {
+                                    messageDigest.update("$videoUri-${config.name}".toByteArray())
+                                }
+                            }
+                            override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int): Bitmap {
+                                return Bitmap.createBitmap(toTransform.width, toTransform.height, Bitmap.Config.ARGB_8888).applyCanvas {
+                                    drawBitmap(toTransform, 0F, 0F, null)
+                                }
+                            }
+
+                        })).listener(object : RequestListener<Bitmap> {
+                            override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Bitmap>?, isFirstResource: Boolean): Boolean {
+                                return false
+                            }
+
+                            override fun onResourceReady(resource: Bitmap?, model: Any?, target: Target<Bitmap>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
+                                currentBitmap = resource
+                                mBinding.imgVideoThumb.post {
+                                    mBinding.imgVideoThumb.setFilterWithConfig(config.value)
+                                }
+                                mBinding.imgVideoThumb.setImageBitmap(currentBitmap)
+                                return false
+                            }
+                        })
+                        .submit()
+            } else {
+                mBinding.imgVideoThumb.setFilterWithConfig(config.value)
+            }
+        } else {
+            mBinding.imgVideoThumb.isVisible = false
+        }
+    }
+
+    private fun generateFilteredVideo(config: String) : Boolean {
         val outputFileName = "${getPath()}/${generateVideoFileName()}"
-        CGEFFmpegNativeLibrary.generateVideoWithFilter(outputFileName, videoUri.toString(), config, 1.0f, null, CGENativeLibrary.TextureBlendMode.CGE_BLEND_ADDREV, 1.0f, false)
-        activity?.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(File(outputFileName))))
+        val result = CGEFFmpegNativeLibrary.generateVideoWithFilter(outputFileName, video?.uri.toString(), config, 1.0f, null, CGENativeLibrary.TextureBlendMode.CGE_BLEND_OVERLAY, 1.0f, false)
+        reScanFile(Uri.fromFile(File(outputFileName)))
+        return result
     }
 
     private fun scheduleRecordTime() {
@@ -252,13 +364,22 @@ internal class VideoPreviewFragment : Fragment() {
         }
     }
 
+    private fun reScanFile(videoUri: Uri) {
+        activity?.let {
+            reScanFile(it, videoUri)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
+        mBinding.imgVideoThumb.onResume()
         mBinding.videoView.onResume()
     }
 
     override fun onPause() {
         super.onPause()
+        mBinding.imgVideoThumb.release()
+        mBinding.imgVideoThumb.onPause()
         mBinding.videoView.release()
         mBinding.videoView.onPause()
     }
@@ -269,17 +390,34 @@ internal class VideoPreviewFragment : Fragment() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         scheduler.shutdown()
+        checkToDeleteUnusedVideo()
+        super.onDestroy()
+    }
+
+    private fun checkToDeleteUnusedVideo() {
+        val videoUri = video?.uri
+        if (fromCamera && isFileUri(videoUri) && isUnusedVideo) {
+            File(videoUri!!.path).apply {
+                if (exists()) {
+                    delete()
+                    activity?.let {
+                        reScanFile(it, videoUri)
+                    }
+                }
+            }
+        }
     }
 
     companion object {
-        private const val EXTRA_VIDEO_URI = "EXTRA_VIDEO_URI"
+        private const val EXTRA_VIDEO = "EXTRA_VIDEO"
+        private const val EXTRA_FROM_CAMERA = "EXTRA_FROM_CAMERA"
 
-        fun newInstance(videoUri: Uri, config: String = ""): VideoPreviewFragment {
+        fun newInstance(video: Video, fromCamera: Boolean): VideoPreviewFragment {
             return VideoPreviewFragment().apply {
                 arguments = Bundle().apply {
-                    putParcelable(EXTRA_VIDEO_URI, videoUri)
+                    putParcelable(EXTRA_VIDEO, video)
+                    putBoolean(EXTRA_FROM_CAMERA, fromCamera)
                 }
             }
         }

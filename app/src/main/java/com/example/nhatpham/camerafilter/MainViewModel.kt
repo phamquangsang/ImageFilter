@@ -7,7 +7,8 @@ internal class MainViewModel : ViewModel() {
 
     val openPhotoPreviewEvent = SingleLiveEvent<Photo>()
     val openPhotoPreviewFromCameraEvent = SingleLiveEvent<Photo>()
-    val openVideoPreviewEvent = SingleLiveEvent<Uri>()
+    val openVideoPreviewEvent = SingleLiveEvent<Video>()
+    val openVideoPreviewFromCameraEvent = SingleLiveEvent<Video>()
     val openGalleryEvent = SingleLiveEvent<Void>()
     val doneEditEvent = SingleLiveEvent<Uri>()
 }

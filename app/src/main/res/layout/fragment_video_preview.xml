@@ -47,8 +47,8 @@
                 android:visibility="gone" />
         </FrameLayout>
 
-        <org.wysaid.view.VideoPlayerGLSurfaceView
-            android:id="@+id/videoView"
+        <FrameLayout
+            android:id="@+id/layoutMedia"
             android:layout_width="0dp"
             android:layout_height="0dp"
             app:layout_constraintDimensionRatio="3:4"
@@ -56,19 +56,18 @@
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/layoutBar" />
+            app:layout_constraintTop_toBottomOf="@+id/layoutBar">
 
-        <ImageView
-            android:id="@+id/imgVideoThumb"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:scaleType="centerCrop"
-            app:layout_constraintBottom_toBottomOf="@+id/videoView"
-            app:layout_constraintEnd_toEndOf="@+id/videoView"
-            app:layout_constraintLeft_toLeftOf="@+id/videoView"
-            app:layout_constraintRight_toRightOf="@+id/videoView"
-            app:layout_constraintStart_toStartOf="@+id/videoView"
-            app:layout_constraintTop_toTopOf="@+id/videoView" />
+            <org.wysaid.view.VideoPlayerGLSurfaceView
+                android:id="@+id/videoView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <org.wysaid.view.ImageGLSurfaceView
+                android:id="@+id/imgVideoThumb"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        </FrameLayout>
 
         <ImageView
             android:id="@+id/btnPlay"
@@ -76,12 +75,12 @@
             android:layout_height="36dp"
             android:scaleType="centerInside"
             android:src="@drawable/circle_play"
-            app:layout_constraintBottom_toBottomOf="@+id/videoView"
-            app:layout_constraintEnd_toEndOf="@+id/videoView"
-            app:layout_constraintLeft_toLeftOf="@+id/videoView"
-            app:layout_constraintRight_toRightOf="@+id/videoView"
-            app:layout_constraintStart_toStartOf="@+id/videoView"
-            app:layout_constraintTop_toTopOf="@+id/videoView" />
+            app:layout_constraintBottom_toBottomOf="@+id/layoutMedia"
+            app:layout_constraintEnd_toEndOf="@+id/layoutMedia"
+            app:layout_constraintLeft_toLeftOf="@+id/layoutMedia"
+            app:layout_constraintRight_toRightOf="@+id/layoutMedia"
+            app:layout_constraintStart_toStartOf="@+id/layoutMedia"
+            app:layout_constraintTop_toTopOf="@+id/layoutMedia" />
 
         <android.support.v7.widget.RecyclerView
             android:id="@+id/rcImgPreview"
@@ -93,7 +92,7 @@
             android:paddingRight="1dp"
             android:paddingBottom="1dp"
             android:visibility="invisible"
-            app:layout_constraintBottom_toBottomOf="@+id/videoView"
+            app:layout_constraintBottom_toBottomOf="@+id/layoutMedia"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
@@ -134,7 +133,7 @@
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toLeftOf="@+id/btnDone"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/videoView" />
+            app:layout_constraintTop_toBottomOf="@+id/layoutMedia" />
 
         <android.support.design.widget.FloatingActionButton
             android:id="@+id/btnDone"
@@ -148,7 +147,7 @@
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/videoView" />
+            app:layout_constraintTop_toBottomOf="@+id/layoutMedia" />
 
         <ImageView
             android:id="@+id/btnPickFilters"
@@ -162,6 +161,6 @@
             app:layout_constraintLeft_toRightOf="@+id/btnDone"
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintStart_toEndOf="@+id/btnDone"
-            app:layout_constraintTop_toBottomOf="@+id/videoView" />
+            app:layout_constraintTop_toBottomOf="@+id/layoutMedia" />
     </android.support.constraint.ConstraintLayout>
 </layout>
