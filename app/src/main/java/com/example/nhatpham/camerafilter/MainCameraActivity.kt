@@ -17,8 +17,14 @@ import android.view.Window
 import android.view.WindowManager
 import com.example.nhatpham.camerafilter.camera.CameraFragment
 import com.example.nhatpham.camerafilter.gallery.GalleryFragment
+import com.example.nhatpham.camerafilter.models.Config
+import com.example.nhatpham.camerafilter.models.Photo
+import com.example.nhatpham.camerafilter.models.Source
+import com.example.nhatpham.camerafilter.models.Video
 import com.example.nhatpham.camerafilter.preview.PhotoPreviewFragment
 import com.example.nhatpham.camerafilter.preview.VideoPreviewFragment
+import com.example.nhatpham.camerafilter.utils.EFFECT_CONFIGS
+import com.example.nhatpham.camerafilter.utils.NONE_CONFIG
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import org.wysaid.common.Common
@@ -61,12 +67,12 @@ class MainCameraActivity : AppCompatActivity() {
         mainViewModel = ViewModelProviders.of(this).get(MainViewModel::class.java)
         mainViewModel.openPhotoPreviewEvent.observe(this, Observer { photo ->
             if (photo != null) {
-                showPhotoPreviewFragment(photo, false)
+                showPhotoPreviewFragment(photo)
             }
         })
         mainViewModel.openPhotoPreviewFromCameraEvent.observe(this, Observer { photo ->
             if (photo != null) {
-                showPhotoPreviewFragment(photo, true)
+                showPhotoPreviewFragment(photo)
             }
         })
         mainViewModel.openVideoPreviewEvent.observe(this, Observer { video ->
@@ -115,7 +121,7 @@ class MainCameraActivity : AppCompatActivity() {
             if (savedInstanceState == null) {
                 if (intent.hasExtra(EXTRA_PHOTO_URI)) {
                     val photoUri : Uri = intent.getParcelableExtra(EXTRA_PHOTO_URI)
-                    showPhotoPreviewFragment(Photo(photoUri, NONE_CONFIG), false, false)
+                    showPhotoPreviewFragment(Photo(photoUri, NONE_CONFIG, Source.NONE), false)
                 } else {
                     showCameraFragment()
                 }
@@ -127,7 +133,7 @@ class MainCameraActivity : AppCompatActivity() {
         val permissions = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO,
                 Manifest.permission.READ_EXTERNAL_STORAGE,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        return requestPermissions(this, REQUEST_PERMISSIONS, *permissions)
+        return com.example.nhatpham.camerafilter.utils.requestPermissions(this, REQUEST_PERMISSIONS, *permissions)
     }
 
     private fun showCameraFragment() {
@@ -136,9 +142,9 @@ class MainCameraActivity : AppCompatActivity() {
                 .commitAllowingStateLoss()
     }
 
-    private fun showPhotoPreviewFragment(photo: Photo, fromCamera: Boolean, shouldAddToBackStack: Boolean = true) {
+    private fun showPhotoPreviewFragment(photo: Photo, shouldAddToBackStack: Boolean = true) {
         supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(photo, fromCamera))
+                .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(photo))
                 .also { if(shouldAddToBackStack) it.addToBackStack(null) }
                 .commit()
     }

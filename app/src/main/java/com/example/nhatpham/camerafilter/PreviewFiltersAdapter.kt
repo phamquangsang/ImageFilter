@@ -5,7 +5,6 @@ import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Bundle
-import android.os.Handler
 import android.support.v7.widget.RecyclerView
 import android.view.LayoutInflater
 import android.view.View
@@ -15,13 +14,12 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool
 import com.bumptech.glide.load.resource.bitmap.BitmapTransformation
 import com.bumptech.glide.request.RequestOptions
-import com.bumptech.glide.request.target.BitmapImageViewTarget
-import com.bumptech.glide.request.transition.Transition
 import com.example.nhatpham.camerafilter.databinding.LayoutPreviewItemBinding
+import com.example.nhatpham.camerafilter.models.Config
+import com.example.nhatpham.camerafilter.utils.convertDpToPixel
 
 import org.wysaid.nativePort.CGENativeLibrary
 import java.security.MessageDigest
-import java.util.concurrent.Executors
 
 internal class PreviewFiltersAdapter(context: Context,
                                      private val configs: List<Config> = emptyList(),

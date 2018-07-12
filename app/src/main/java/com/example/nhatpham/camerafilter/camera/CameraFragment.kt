@@ -4,7 +4,6 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.arch.lifecycle.Observer
 import android.arch.lifecycle.ViewModelProviders
-import android.content.Intent
 import android.databinding.DataBindingUtil
 import android.net.Uri
 import android.os.Bundle
@@ -24,6 +23,8 @@ import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import com.example.nhatpham.camerafilter.*
 import com.example.nhatpham.camerafilter.databinding.FragmentCameraFiltersBinding
+import com.example.nhatpham.camerafilter.models.*
+import com.example.nhatpham.camerafilter.utils.*
 import org.wysaid.camera.CameraInstance
 import org.wysaid.myUtils.FileUtil
 import org.wysaid.myUtils.ImageUtil
@@ -127,7 +128,7 @@ internal class CameraFragment : Fragment() {
                         reScanFile(it, fileUri)
                     }
                     val config = cameraViewModel.currentConfigLiveData.value ?: NONE_CONFIG
-                    mainViewModel.openPhotoPreviewFromCameraEvent.value = Photo(fileUri, config)
+                    mainViewModel.openPhotoPreviewFromCameraEvent.value = Photo(fileUri, config, Source.CAMERA)
                 }
             }, null, NONE_CONFIG.value, 1.0f, true)
         }
@@ -276,7 +277,8 @@ internal class CameraFragment : Fragment() {
         context?.let {
             reScanFile(it, fileUri)
         }
-        mainViewModel.openVideoPreviewFromCameraEvent.value = Video(fileUri, cameraViewModel.currentConfigLiveData.value ?: NONE_CONFIG)
+        mainViewModel.openVideoPreviewFromCameraEvent.value = Video(fileUri, cameraViewModel.currentConfigLiveData.value
+                ?: NONE_CONFIG)
         cameraViewModel.recordingStateLiveData.postValue(false)
     }
 

@@ -4,14 +4,12 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.arch.lifecycle.Observer
 import android.arch.lifecycle.ViewModelProviders
-import android.content.Intent
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v7.widget.LinearLayoutManager
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -26,9 +24,12 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.webkit.URLUtil
 import androidx.core.view.isVisible
 import com.example.nhatpham.camerafilter.*
+import com.example.nhatpham.camerafilter.models.Config
+import com.example.nhatpham.camerafilter.models.Photo
+import com.example.nhatpham.camerafilter.models.isFromCamera
+import com.example.nhatpham.camerafilter.utils.*
 import org.wysaid.myUtils.ImageUtil
 import java.io.File
-import java.lang.System.exit
 
 
 internal class PhotoPreviewFragment : Fragment() {
@@ -36,9 +37,6 @@ internal class PhotoPreviewFragment : Fragment() {
     private lateinit var mBinding: FragmentPhotoPreviewBinding
     private val photo: Photo? by lazy {
         arguments?.getParcelable(EXTRA_PHOTO) as? Photo
-    }
-    private val fromCamera: Boolean by lazy {
-        arguments?.getBoolean(EXTRA_FROM_CAMERA) ?: false
     }
     private val imagePathToSave by lazy {
         "${getPath()}/${generateImageFileName()}"
@@ -146,9 +144,7 @@ internal class PhotoPreviewFragment : Fragment() {
             }
         }
 
-        mBinding.btnBack.setOnClickListener {
-            exit()
-        }
+        mBinding.btnBack.setOnClickListener { exit() }
 
         Glide.with(this)
                 .asBitmap()
@@ -245,17 +241,16 @@ internal class PhotoPreviewFragment : Fragment() {
     }
 
     override fun onDestroy() {
-        checkToDeleteUnusedPhoto()
+        photo?.let { checkToDeleteUnused(it) }
         super.onDestroy()
     }
 
-    private fun checkToDeleteUnusedPhoto() {
-        val photoUri = photo?.uri
-        if (fromCamera && isFileUri(photoUri) && isUnusedPhoto) {
-            File(photoUri!!.path).apply {
+    private fun checkToDeleteUnused(photo: Photo) {
+        if (photo.isFromCamera() && isFileUri(photo.uri) && isUnusedPhoto) {
+            File(photo.uri.path).apply {
                 if (exists()) {
                     delete()
-                    reScanFile(photoUri)
+                    reScanFile(photo.uri)
                 }
             }
         }
@@ -263,13 +258,11 @@ internal class PhotoPreviewFragment : Fragment() {
 
     companion object {
         private const val EXTRA_PHOTO = "EXTRA_PHOTO"
-        private const val EXTRA_FROM_CAMERA = "EXTRA_FROM_CAMERA"
 
-        fun newInstance(photo: Photo, fromCamera: Boolean): PhotoPreviewFragment {
+        fun newInstance(photo: Photo): PhotoPreviewFragment {
             return PhotoPreviewFragment().apply {
                 arguments = Bundle().apply {
                     putParcelable(EXTRA_PHOTO, photo)
-                    putBoolean(EXTRA_FROM_CAMERA, fromCamera)
                 }
             }
         }

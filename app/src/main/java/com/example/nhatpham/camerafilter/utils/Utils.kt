@@ -1,4 +1,4 @@
-package com.example.nhatpham.camerafilter
+package com.example.nhatpham.camerafilter.utils
 
 import android.app.Activity
 import android.content.ContentResolver
@@ -15,8 +15,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import android.os.Environment
 import android.provider.MediaStore
-import android.text.TextUtils.isEmpty
-import com.google.gson.annotations.SerializedName
+import com.example.nhatpham.camerafilter.models.Config
 import java.io.File
 import kotlin.collections.ArrayList
 
