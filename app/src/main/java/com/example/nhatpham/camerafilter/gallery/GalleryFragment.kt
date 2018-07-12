@@ -44,9 +44,10 @@ internal class GalleryFragment : Fragment() {
         }
         mBinding.rcImages.adapter = ImagesAdapter(thumbnails, object : ImagesAdapter.OnItemInteractListener {
             override fun onThumbnailSelected(thumbnail: Thumbnail) {
-                if (thumbnail.isVideo)
-                    mainViewModel.openVideoPreviewEvent.value = Video(ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, thumbnail.id), NONE_CONFIG)
-                else {
+                if (thumbnail.isVideo) {
+                    val videoUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, thumbnail.id)
+                    mainViewModel.openVideoPreviewEvent.value = Video(videoUri, NONE_CONFIG, Source.GALLERY)
+                } else {
                     val photoUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, thumbnail.id)
                     mainViewModel.openPhotoPreviewEvent.value = Photo(photoUri, NONE_CONFIG, Source.GALLERY)
                 }

@@ -17,6 +17,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import com.example.nhatpham.camerafilter.models.Config
 import java.io.File
+import java.nio.file.Files.exists
 import kotlin.collections.ArrayList
 
 const val APP_NAME = "Mingle"
@@ -65,6 +66,13 @@ internal fun getThumbnail(context: Context, videoUri: Uri): Bitmap? {
     return bitmap
 }
 
+/* Checks if external storage is available for read and write */
+internal fun isExternalStorageWritable() = Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED
+
+/* Checks if external storage is available to at least read */
+internal fun isExternalStorageReadable() = Environment.getExternalStorageState() in
+        setOf(Environment.MEDIA_MOUNTED, Environment.MEDIA_MOUNTED_READ_ONLY)
+
 internal fun getPath(): String {
     val path = "${Environment.getExternalStorageDirectory().absolutePath}/$APP_NAME"
     File(path).run {
@@ -72,6 +80,15 @@ internal fun getPath(): String {
             mkdirs()
     }
     return path
+}
+
+internal fun getInternalPath(context: Context): String {
+    val file = context.getDir("$APP_NAME-camera", Context.MODE_PRIVATE)
+    return file.apply {
+        if(!exists()) {
+            mkdirs()
+        }
+    }.absolutePath
 }
 
 internal fun generateImageFileName() = "IMG_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Calendar.getInstance().time)}.jpg"

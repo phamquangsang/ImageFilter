@@ -35,11 +35,14 @@ import com.bumptech.glide.request.target.Target
 import com.example.nhatpham.camerafilter.*
 import com.example.nhatpham.camerafilter.models.Config
 import com.example.nhatpham.camerafilter.models.Video
+import com.example.nhatpham.camerafilter.models.isFromCamera
 import com.example.nhatpham.camerafilter.utils.*
 import org.wysaid.nativePort.CGEFFmpegNativeLibrary
 import org.wysaid.nativePort.CGENativeLibrary
 import org.wysaid.view.ImageGLSurfaceView
 import java.io.File
+import java.nio.file.Files.delete
+import java.nio.file.Files.exists
 import java.security.MessageDigest
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
@@ -52,22 +55,23 @@ internal class VideoPreviewFragment : Fragment() {
     private val video: Video? by lazy {
         arguments?.getParcelable(EXTRA_VIDEO) as? Video
     }
-    private val fromCamera: Boolean by lazy {
-        arguments?.getBoolean(EXTRA_FROM_CAMERA) ?: false
+    private val videoPathToSave by lazy {
+        "${getPath()}/${generateVideoFileName()}"
     }
+
     private lateinit var mainViewModel: MainViewModel
     private lateinit var videoPreviewViewModel: PhotoPreviewViewModel
     private val mainHandler = Handler()
     private var mediaPlayer: MediaPlayer? = null
     private var scheduler = Executors.newScheduledThreadPool(2)
-    private var timeRecordingFuture : ScheduledFuture<*>? = null
+    private var timeRecordingFuture: ScheduledFuture<*>? = null
 
     private val progressDialogFragment = ProgressDialogFragment()
     private lateinit var previewFiltersAdapter: PreviewFiltersAdapter
+    private var canPlay = true
     private var currentBitmap: Bitmap? = null
-    private var isUnusedVideo = true
     private val currentConfig
-    get() = videoPreviewViewModel.currentConfigLiveData.value ?: NONE_CONFIG
+        get() = videoPreviewViewModel.currentConfigLiveData.value ?: NONE_CONFIG
 
     private val playCompletionCallback = object : VideoPlayerGLSurfaceView.PlayCompletionCallback {
         override fun playComplete(player: MediaPlayer) {
@@ -80,6 +84,7 @@ internal class VideoPreviewFragment : Fragment() {
 
         override fun playFailed(player: MediaPlayer, what: Int, extra: Int): Boolean {
             Log.d(Common.LOG_TAG, String.format("Error occured! Stop playing, Err code: %d, %d", what, extra))
+            canPlay = false
             return true
         }
     }
@@ -100,8 +105,8 @@ internal class VideoPreviewFragment : Fragment() {
 
         videoPreviewViewModel.currentConfigLiveData.value = video?.config ?: NONE_CONFIG
         videoPreviewViewModel.currentConfigLiveData.observe(viewLifecycleOwner, Observer { newConfig ->
-            if(newConfig != null) {
-                if(mediaPlayer == null || !mediaPlayer!!.isPlaying) {
+            if (newConfig != null) {
+                if (mediaPlayer == null || !mediaPlayer!!.isPlaying) {
                     showThumbnail(true)
                 }
                 mBinding.videoView.setFilterWithConfig(newConfig.value)
@@ -122,7 +127,7 @@ internal class VideoPreviewFragment : Fragment() {
 
         mBinding.videoView.apply {
             setZOrderOnTop(false)
-            setPlayerInitializeCallback{ player ->
+            setPlayerInitializeCallback { player ->
                 player.setOnBufferingUpdateListener { _, percent ->
                     if (percent == 100) {
                         player.setOnBufferingUpdateListener(null)
@@ -141,7 +146,7 @@ internal class VideoPreviewFragment : Fragment() {
         }
 
         mBinding.btnPlay.setOnClickListener {
-            if(mediaPlayer != null) {
+            if (mediaPlayer != null) {
                 mBinding.videoView.isVisible = true
                 startPlayingVideo()
             } else {
@@ -163,72 +168,33 @@ internal class VideoPreviewFragment : Fragment() {
         }
 
         mBinding.btnDone.setOnClickListener {
-            val videoUri = video?.uri
-            if(isMediaStoreVideoUri(videoUri)) {
+            val currentVideo = video
+            if (currentVideo != null && (isMediaStoreVideoUri(currentVideo.uri) || isFileUri(currentVideo.uri))) {
                 mediaPlayer?.run {
-                    if(isPlaying)
+                    if (isPlaying)
                         stop()
                 }
-
-                val currentConfig = videoPreviewViewModel.currentConfigLiveData.value
-                if(currentConfig == null || currentConfig == NONE_CONFIG) {
-                    mainViewModel.doneEditEvent.value = videoUri
-                    return@setOnClickListener
-                }
-
-                progressDialogFragment.show(fragmentManager, ProgressDialogFragment::class.java.simpleName)
-                scheduler.submit {
-                    if(generateFilteredVideo(currentConfig.value)) {
-                        mainHandler.post {
-                            progressDialogFragment.dismiss()
-                            isUnusedVideo = false
-                        }
-                        mainViewModel.doneEditEvent.postValue(videoUri)
-                    } else {
-                        mainHandler.post {
-                            progressDialogFragment.dismiss()
-                        }
-                        mainViewModel.doneEditEvent.postValue(null)
-                    }
-                }
-            } else if(isFileUri(videoUri)) {
-                mediaPlayer?.run {
-                    if(isPlaying)
-                        stop()
-                }
-
-                if(!File(videoUri!!.path).exists()) {
+                if (!File(currentVideo.uri.path).exists()) {
                     mainViewModel.doneEditEvent.value = null
                     return@setOnClickListener
                 }
-                val currentConfig = videoPreviewViewModel.currentConfigLiveData.value
-                if(currentConfig == null || currentConfig == NONE_CONFIG) {
-                    mainViewModel.doneEditEvent.value = videoUri
-                    return@setOnClickListener
-                }
-
                 progressDialogFragment.show(fragmentManager, ProgressDialogFragment::class.java.simpleName)
-                scheduler.submit {
-                    if(generateFilteredVideo(currentConfig.value)) {
-                        mainHandler.post {
-                            progressDialogFragment.dismiss()
-                            isUnusedVideo = false
-                        }
-                        mainViewModel.doneEditEvent.postValue(videoUri)
-                    } else {
+
+                if(isExternalStorageWritable()) {
+                    scheduler.submit {
+                        val result = generateFilteredVideo(videoPathToSave, currentConfig.value)
                         mainHandler.post {
                             progressDialogFragment.dismiss()
                         }
-                        mainViewModel.doneEditEvent.postValue(null)
+                        mainViewModel.doneEditEvent.postValue(result)
                     }
                 }
-            }
+            } else mainViewModel.doneEditEvent.value = null
         }
 
         mBinding.btnBack.setOnClickListener {
             activity?.supportFragmentManager?.popBackStack()
         }
-
         showThumbnail(true)
     }
 
@@ -242,10 +208,10 @@ internal class VideoPreviewFragment : Fragment() {
     }
 
     private fun showThumbnail(visible: Boolean, config: Config = currentConfig) {
-        if(visible) {
+        if (visible) {
             mBinding.imgVideoThumb.isVisible = true
 
-            if(currentBitmap == null) {
+            if (currentBitmap == null) {
                 Glide.with(this)
                         .asBitmap()
                         .load(video?.uri)
@@ -253,10 +219,11 @@ internal class VideoPreviewFragment : Fragment() {
                         .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
                             override fun updateDiskCacheKey(messageDigest: MessageDigest) {
                                 val videoUri = video?.uri
-                                if(videoUri != null) {
+                                if (videoUri != null) {
                                     messageDigest.update("$videoUri-${config.name}".toByteArray())
                                 }
                             }
+
                             override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int): Bitmap {
                                 return Bitmap.createBitmap(toTransform.width, toTransform.height, Bitmap.Config.ARGB_8888).applyCanvas {
                                     drawBitmap(toTransform, 0F, 0F, null)
@@ -286,11 +253,13 @@ internal class VideoPreviewFragment : Fragment() {
         }
     }
 
-    private fun generateFilteredVideo(config: String) : Boolean {
-        val outputFileName = "${getPath()}/${generateVideoFileName()}"
-        val result = CGEFFmpegNativeLibrary.generateVideoWithFilter(outputFileName, video?.uri.toString(), config, 1.0f, null, CGENativeLibrary.TextureBlendMode.CGE_BLEND_OVERLAY, 1.0f, false)
-        reScanFile(Uri.fromFile(File(outputFileName)))
-        return result
+    private fun generateFilteredVideo(outputPath: String, config: String): Uri? {
+        val result = CGEFFmpegNativeLibrary.generateVideoWithFilter(outputPath, video?.uri.toString(), config, 1.0f, null, CGENativeLibrary.TextureBlendMode.CGE_BLEND_OVERLAY, 1.0f, false)
+        return if (result) {
+            Uri.fromFile(File(outputPath)).also {
+                reScanFile(it)
+            }
+        } else null
     }
 
     private fun scheduleRecordTime() {
@@ -389,18 +358,20 @@ internal class VideoPreviewFragment : Fragment() {
 
     override fun onDestroy() {
         scheduler.shutdown()
-        checkToDeleteUnusedVideo()
+        video?.let {
+            if (it.isFromCamera())
+                checkToDeleteTempFile(it.uri)
+        }
         super.onDestroy()
     }
 
-    private fun checkToDeleteUnusedVideo() {
-        val videoUri = video?.uri
-        if (fromCamera && isFileUri(videoUri) && isUnusedVideo) {
-            File(videoUri!!.path).apply {
+    private fun checkToDeleteTempFile(uri: Uri) {
+        if (isFileUri(uri)) {
+            File(uri.path).apply {
                 if (exists()) {
                     delete()
                     activity?.let {
-                        reScanFile(it, videoUri)
+                        reScanFile(it, uri)
                     }
                 }
             }
@@ -409,13 +380,11 @@ internal class VideoPreviewFragment : Fragment() {
 
     companion object {
         private const val EXTRA_VIDEO = "EXTRA_VIDEO"
-        private const val EXTRA_FROM_CAMERA = "EXTRA_FROM_CAMERA"
 
-        fun newInstance(video: Video, fromCamera: Boolean): VideoPreviewFragment {
+        fun newInstance(video: Video): VideoPreviewFragment {
             return VideoPreviewFragment().apply {
                 arguments = Bundle().apply {
                     putParcelable(EXTRA_VIDEO, video)
-                    putBoolean(EXTRA_FROM_CAMERA, fromCamera)
                 }
             }
         }

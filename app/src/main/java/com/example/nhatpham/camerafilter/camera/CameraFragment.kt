@@ -4,6 +4,7 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.arch.lifecycle.Observer
 import android.arch.lifecycle.ViewModelProviders
+import android.content.Context
 import android.databinding.DataBindingUtil
 import android.net.Uri
 import android.os.Bundle
@@ -45,6 +46,8 @@ internal class CameraFragment : Fragment() {
     private var snapHelper = PagerSnapHelper()
     private var scheduler = Executors.newSingleThreadScheduledExecutor()
     private var timeRecordingFuture: ScheduledFuture<*>? = null
+    private val currentConfig
+        get() = cameraViewModel.currentConfigLiveData.value ?: NONE_CONFIG
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_camera_filters, container, false)
@@ -66,7 +69,7 @@ internal class CameraFragment : Fragment() {
         })
 
         cameraViewModel.currentConfigLiveData.observe(viewLifecycleOwner, Observer { newConfig ->
-            if(newConfig != null) {
+            if (newConfig != null) {
                 mBinding.cameraView.setFilterWithConfig(newConfig.value)
                 mBinding.tvFilterName.text = newConfig.name
                 previewFiltersAdapter.setNewConfig(newConfig)
@@ -77,7 +80,7 @@ internal class CameraFragment : Fragment() {
             val active = it == true
             mBinding.btnRecord.setImageResource(if (active) R.drawable.stop_recording else R.drawable.start_record)
             cameraViewModel.isRecording.set(active)
-            if(active)
+            if (active)
                 showFilters(false)
             else cameraViewModel.showFiltersEvent.value = cameraViewModel.showFiltersEvent.value
         })
@@ -117,21 +120,8 @@ internal class CameraFragment : Fragment() {
             }
         })
 
-        mBinding.btnTakePhoto.setOnClickListener {
-            mBinding.cameraView.takePicture({ bitmap ->
-                if (bitmap != null) {
-                    val filePath = ImageUtil.saveBitmap(bitmap, "${getPath()}/${generateImageFileName()}")
-                    bitmap.recycle()
+        mBinding.btnTakePhoto.setOnClickListener { context?.let { takePhoto(it) } }
 
-                    val fileUri = Uri.fromFile(File(filePath))
-                    context?.let {
-                        reScanFile(it, fileUri)
-                    }
-                    val config = cameraViewModel.currentConfigLiveData.value ?: NONE_CONFIG
-                    mainViewModel.openPhotoPreviewFromCameraEvent.value = Photo(fileUri, config, Source.CAMERA)
-                }
-            }, null, NONE_CONFIG.value, 1.0f, true)
-        }
         mBinding.btnRecord.setOnClickListener(RecordListener())
 
         mBinding.btnPickFilters.setOnClickListener {
@@ -154,9 +144,25 @@ internal class CameraFragment : Fragment() {
             setZOrderOnTop(false)
             setZOrderMediaOverlay(true)
             setOnCreateCallback {
-                setFilterWithConfig(cameraViewModel.currentConfigLiveData.value?.value ?: NONE_CONFIG.value)
+                setFilterWithConfig(currentConfig.value)
             }
         }
+    }
+
+    private fun takePhoto(context: Context) {
+        mBinding.cameraView.takePicture({ bitmap ->
+            if (bitmap != null) {
+                val filePath = ImageUtil.saveBitmap(bitmap, "${getInternalPath(context)}/${generateImageFileName()}")
+                bitmap.recycle()
+
+                if (!filePath.isNullOrEmpty()) {
+                    val fileUri = Uri.fromFile(File(filePath)).also {
+                        reScanFile(context, it)
+                    }
+                    mainViewModel.openPhotoPreviewEvent.value = Photo(fileUri, currentConfig, Source.CAMERA)
+                }
+            }
+        }, null, NONE_CONFIG.value, 1.0f, true)
     }
 
     private fun updateModeView(newMode: CameraMode) {
@@ -189,7 +195,7 @@ internal class CameraFragment : Fragment() {
             }
             mBinding.tvFilterName.post {
                 mBinding.tvFilterName.alpha = 0.6F
-                mBinding.tvFilterName.text = cameraViewModel.currentConfigLiveData.value?.name
+                mBinding.tvFilterName.text = currentConfig.name
                 mBinding.tvFilterName.isVisible = true
             }
             mBinding.tvFilterName.post {
@@ -200,7 +206,7 @@ internal class CameraFragment : Fragment() {
                         .start()
             }
             mBinding.btnPickFilters.isSelected = true
-        } else if(!visible && mBinding.rcImgPreview.isVisible){
+        } else if (!visible && mBinding.rcImgPreview.isVisible) {
             mBinding.rcImgPreview.animate()
                     .alpha(0F)
                     .setDuration(duration)
@@ -273,16 +279,14 @@ internal class CameraFragment : Fragment() {
     private fun onFinishRecording(recordedFilePath: String) {
         cancelScheduleRecordTime()
 
-        val fileUri = Uri.fromFile(File(recordedFilePath))
-        context?.let {
-            reScanFile(it, fileUri)
+        val fileUri = Uri.fromFile(File(recordedFilePath)).also {
+            context?.run { reScanFile(this, it) }
         }
-        mainViewModel.openVideoPreviewFromCameraEvent.value = Video(fileUri, cameraViewModel.currentConfigLiveData.value
-                ?: NONE_CONFIG)
+        mainViewModel.openVideoPreviewEvent.value = Video(fileUri, currentConfig, Source.CAMERA)
         cameraViewModel.recordingStateLiveData.postValue(false)
     }
 
-    inner class RecordListener : View.OnClickListener {
+    private inner class RecordListener : View.OnClickListener {
 
         private var isValid = true
         private var recordFilePath: String = ""
@@ -294,7 +298,7 @@ internal class CameraFragment : Fragment() {
             isValid = false
 
             if (!mBinding.cameraView.isRecording) {
-                recordFilePath = "${getPath()}/${generateVideoFileName()}"
+                recordFilePath = "${getInternalPath(context!!)}/${generateVideoFileName()}"
 
                 mBinding.cameraView.startRecording(recordFilePath, { success ->
                     if (success) {

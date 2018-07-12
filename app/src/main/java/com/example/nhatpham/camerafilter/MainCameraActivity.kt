@@ -70,19 +70,9 @@ class MainCameraActivity : AppCompatActivity() {
                 showPhotoPreviewFragment(photo)
             }
         })
-        mainViewModel.openPhotoPreviewFromCameraEvent.observe(this, Observer { photo ->
-            if (photo != null) {
-                showPhotoPreviewFragment(photo)
-            }
-        })
         mainViewModel.openVideoPreviewEvent.observe(this, Observer { video ->
             if (video != null) {
-                showVideoPreviewFragment(video, false)
-            }
-        })
-        mainViewModel.openVideoPreviewFromCameraEvent.observe(this, Observer { video ->
-            if (video != null) {
-                showVideoPreviewFragment(video, true)
+                showVideoPreviewFragment(video)
             }
         })
         mainViewModel.openGalleryEvent.observe(this, Observer {
@@ -149,9 +139,9 @@ class MainCameraActivity : AppCompatActivity() {
                 .commit()
     }
 
-    private fun showVideoPreviewFragment(video: Video, fromCamera: Boolean, shouldAddToBackStack: Boolean = true) {
+    private fun showVideoPreviewFragment(video: Video, shouldAddToBackStack: Boolean = true) {
         supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, VideoPreviewFragment.newInstance(video, fromCamera))
+                .replace(R.id.fragment_container, VideoPreviewFragment.newInstance(video))
                 .also { if(shouldAddToBackStack) it.addToBackStack(null) }
                 .commit()
     }
