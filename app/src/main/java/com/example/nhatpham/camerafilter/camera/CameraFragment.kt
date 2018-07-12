@@ -68,6 +68,15 @@ internal class CameraFragment : Fragment() {
             updateModeView(it ?: CameraMode.Photo)
         })
 
+        if(cameraViewModel.cameraBackForwardLiveData.value == null) {
+            cameraViewModel.cameraBackForwardLiveData.value = mBinding.cameraView.isCameraBackForward
+        }
+        cameraViewModel.cameraBackForwardLiveData.observe(viewLifecycleOwner, Observer {
+            if(mBinding.cameraView.isCameraBackForward != it) {
+                mBinding.cameraView.switchCamera()
+            }
+        })
+
         cameraViewModel.currentConfigLiveData.observe(viewLifecycleOwner, Observer { newConfig ->
             if (newConfig != null) {
                 mBinding.cameraView.setFilterWithConfig(newConfig.value)
@@ -120,13 +129,16 @@ internal class CameraFragment : Fragment() {
             }
         })
 
-        mBinding.btnTakePhoto.setOnClickListener { context?.let { takePhoto(it) } }
-
         mBinding.btnRecord.setOnClickListener(RecordListener())
+
+        mBinding.btnTakePhoto.setOnClickListener {
+            context?.let { takePhoto(it) }
+        }
 
         mBinding.btnPickFilters.setOnClickListener {
             cameraViewModel.showFiltersEvent.value = cameraViewModel.showFiltersEvent.value?.not() ?: true
         }
+
         mBinding.btnGallery.setOnClickListener {
             mainViewModel.openGalleryEvent.call()
         }
@@ -137,6 +149,7 @@ internal class CameraFragment : Fragment() {
 
         mBinding.btnSwitch.setOnClickListener {
             mBinding.cameraView.switchCamera()
+            cameraViewModel.cameraBackForwardLiveData.value = mBinding.cameraView.isCameraBackForward
         }
 
         mBinding.cameraView.apply {

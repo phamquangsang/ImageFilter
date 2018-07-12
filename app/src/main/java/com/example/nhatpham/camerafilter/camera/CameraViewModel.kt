@@ -13,6 +13,7 @@ internal class CameraViewModel : ViewModel() {
     val currentModeLiveData = MutableLiveData<CameraMode>().apply { value = CameraMode.Photo }
     val currentConfigLiveData = MutableLiveData<Config>().apply { value = NONE_CONFIG }
     val recordingStateLiveData = SingleLiveEvent<Boolean>()
+    val cameraBackForwardLiveData = MutableLiveData<Boolean>()
 
     val isRecording = ObservableBoolean(false)
 }
