@@ -55,4 +55,12 @@ dependencies {
     // Gson
     implementation 'com.google.code.gson:gson:2.8.4'
     implementation project(':library')
+
+    // WorkManager
+    def work_version = "1.0.0-alpha04"
+    implementation "android.arch.work:work-runtime:$work_version" // use -ktx for Kotlin
+    // optional - Firebase JobDispatcher support
+    implementation "android.arch.work:work-firebase:$work_version"
+    // optional - Test helpers
+    androidTestImplementation "android.arch.work:work-testing:$work_version"
 }
