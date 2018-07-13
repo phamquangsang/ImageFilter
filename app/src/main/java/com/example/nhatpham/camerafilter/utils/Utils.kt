@@ -11,10 +11,13 @@ import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.util.DisplayMetrics
 import android.net.Uri
+import android.os.Build
 import java.text.SimpleDateFormat
 import java.util.*
 import android.os.Environment
 import android.provider.MediaStore
+import android.view.View
+import android.view.ViewTreeObserver
 import com.example.nhatpham.camerafilter.models.Config
 import java.io.File
 import java.nio.file.Files.exists
@@ -110,4 +113,19 @@ internal fun isFileUri(uri: Uri?): Boolean = uri != null && ContentResolver.SCHE
 
 internal fun reScanFile(context: Context, fileUri: Uri) {
     context.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, fileUri))
+}
+
+internal inline fun <T: View> T.afterMeasured(crossinline f: T.() -> Unit) {
+    viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+        override fun onGlobalLayout() {
+            if (measuredWidth > 0 && measuredHeight > 0) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                    viewTreeObserver.removeOnGlobalLayoutListener(this)
+                } else {
+                    viewTreeObserver.removeGlobalOnLayoutListener(this)
+                }
+                f()
+            }
+        }
+    })
 }

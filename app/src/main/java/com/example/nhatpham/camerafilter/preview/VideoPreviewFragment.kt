@@ -212,39 +212,40 @@ internal class VideoPreviewFragment : Fragment() {
             mBinding.imgVideoThumb.isVisible = true
 
             if (currentBitmap == null) {
-                Glide.with(this)
-                        .asBitmap()
-                        .load(video?.uri)
-                        .apply(RequestOptions.skipMemoryCacheOf(true))
-                        .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
-                            override fun updateDiskCacheKey(messageDigest: MessageDigest) {
-                                val videoUri = video?.uri
-                                if (videoUri != null) {
-                                    messageDigest.update("$videoUri-${config.name}".toByteArray())
+                mBinding.imgVideoThumb.afterMeasured {
+                    Glide.with(this)
+                            .asBitmap()
+                            .load(video?.uri)
+                            .apply(RequestOptions.skipMemoryCacheOf(true))
+                            .apply(RequestOptions.overrideOf(width, height))
+                            .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
+                                override fun updateDiskCacheKey(messageDigest: MessageDigest) {
+                                    val videoUri = video?.uri
+                                    if (videoUri != null) {
+                                        messageDigest.update("$videoUri-${config.name}".toByteArray())
+                                    }
                                 }
-                            }
 
-                            override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int): Bitmap {
-                                return Bitmap.createBitmap(toTransform.width, toTransform.height, Bitmap.Config.ARGB_8888).applyCanvas {
-                                    drawBitmap(toTransform, 0F, 0F, null)
+                                override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int): Bitmap {
+                                    return Bitmap.createBitmap(toTransform.width, toTransform.height, Bitmap.Config.ARGB_8888).applyCanvas {
+                                        drawBitmap(toTransform, 0F, 0F, null)
+                                    }
                                 }
-                            }
 
-                        })).listener(object : RequestListener<Bitmap> {
-                            override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Bitmap>?, isFirstResource: Boolean): Boolean {
-                                return false
-                            }
-
-                            override fun onResourceReady(resource: Bitmap?, model: Any?, target: Target<Bitmap>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
-                                currentBitmap = resource
-                                mBinding.imgVideoThumb.post {
-                                    mBinding.imgVideoThumb.setFilterWithConfig(config.value)
+                            })).listener(object : RequestListener<Bitmap> {
+                                override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Bitmap>?, isFirstResource: Boolean): Boolean {
+                                    return false
                                 }
-                                mBinding.imgVideoThumb.setImageBitmap(currentBitmap)
-                                return false
-                            }
-                        })
-                        .submit()
+
+                                override fun onResourceReady(resource: Bitmap?, model: Any?, target: Target<Bitmap>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
+                                    currentBitmap = resource
+                                    setImageBitmap(currentBitmap)
+                                    setFilterWithConfig(config.value)
+                                    return false
+                                }
+                            })
+                            .submit()
+                }
             } else {
                 mBinding.imgVideoThumb.setFilterWithConfig(config.value)
             }

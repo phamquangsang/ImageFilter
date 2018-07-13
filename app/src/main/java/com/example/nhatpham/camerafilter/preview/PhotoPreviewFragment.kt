@@ -23,6 +23,7 @@ import org.wysaid.view.ImageGLSurfaceView
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.webkit.URLUtil
 import androidx.core.view.isVisible
+import com.bumptech.glide.request.RequestOptions
 import com.example.nhatpham.camerafilter.*
 import com.example.nhatpham.camerafilter.models.Config
 import com.example.nhatpham.camerafilter.models.Photo
@@ -30,6 +31,7 @@ import com.example.nhatpham.camerafilter.models.isFromCamera
 import com.example.nhatpham.camerafilter.models.isFromGallery
 import com.example.nhatpham.camerafilter.utils.*
 import org.wysaid.myUtils.ImageUtil
+import org.wysaid.nativePort.CGEFFmpegNativeLibrary
 import java.io.File
 import java.lang.System.exit
 
@@ -136,23 +138,26 @@ internal class PhotoPreviewFragment : Fragment() {
 
         mBinding.btnBack.setOnClickListener { exit() }
 
-        Glide.with(this)
-                .asBitmap()
-                .load(photo?.uri)
-                .listener(object : RequestListener<Bitmap> {
-                    override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Bitmap>?, isFirstResource: Boolean): Boolean {
-                        return false
-                    }
-
-                    override fun onResourceReady(resource: Bitmap?, model: Any?, target: Target<Bitmap>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
-                        currentBitmap = resource
-                        mBinding.imageView.post {
-                            mBinding.imageView.setFilterWithConfig(currentConfig.value)
+        mBinding.imageView.afterMeasured {
+            Glide.with(this)
+                    .asBitmap()
+                    .load(photo?.uri)
+                    .apply(RequestOptions.overrideOf(width, height))
+                    .listener(object : RequestListener<Bitmap> {
+                        override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Bitmap>?, isFirstResource: Boolean): Boolean {
+                            return false
                         }
-                        mBinding.imageView.setImageBitmap(currentBitmap)
-                        return false
-                    }
-                }).submit()
+
+                        override fun onResourceReady(resource: Bitmap?, model: Any?, target: Target<Bitmap>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
+                            currentBitmap = resource
+                            mBinding.imageView.post {
+                                mBinding.imageView.setFilterWithConfig(currentConfig.value)
+                            }
+                            mBinding.imageView.setImageBitmap(currentBitmap)
+                            return false
+                        }
+                    }).submit()
+        }
     }
 
     private fun showFilters(visible: Boolean) {
