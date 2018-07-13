@@ -1,6 +1,8 @@
 package com.example.nhatpham.camerafilter.utils
 
 import android.app.Activity
+import android.arch.lifecycle.ViewModel
+import android.arch.lifecycle.ViewModelProviders
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
@@ -16,11 +18,14 @@ import java.text.SimpleDateFormat
 import java.util.*
 import android.os.Environment
 import android.provider.MediaStore
+import android.support.v4.app.Fragment
+import android.support.v4.app.FragmentActivity
 import android.view.View
 import android.view.ViewTreeObserver
 import com.example.nhatpham.camerafilter.models.Config
+import com.google.gson.Gson
 import java.io.File
-import java.nio.file.Files.exists
+import java.lang.ref.WeakReference
 import kotlin.collections.ArrayList
 
 const val APP_NAME = "Mingle"
@@ -129,3 +134,21 @@ internal inline fun <T: View> T.afterMeasured(crossinline f: T.() -> Unit) {
         }
     })
 }
+
+private var gSonWeakRef = WeakReference<Gson>(Gson())
+
+internal val gSon : Gson
+get() {
+    var gSon = gSonWeakRef.get()
+    if(gSon == null) {
+        gSon = Gson()
+        gSonWeakRef = WeakReference(gSon)
+    }
+    return gSon
+}
+
+internal fun Any.toJson() = gSon.toJson(this)
+
+internal inline fun <reified T : ViewModel> getViewModel(fragmentActivity: FragmentActivity) = ViewModelProviders.of(fragmentActivity).get(T::class.java)
+
+internal inline fun <reified T : ViewModel> getViewModel(fragment: Fragment) = ViewModelProviders.of(fragment).get(T::class.java)

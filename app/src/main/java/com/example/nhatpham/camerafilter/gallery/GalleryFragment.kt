@@ -1,6 +1,5 @@
 package com.example.nhatpham.camerafilter.gallery
 
-import android.arch.lifecycle.ViewModelProviders
 import android.content.ContentUris
 import android.databinding.DataBindingUtil
 import android.net.Uri
@@ -17,6 +16,7 @@ import com.example.nhatpham.camerafilter.models.Photo
 import com.example.nhatpham.camerafilter.models.Source
 import com.example.nhatpham.camerafilter.models.Video
 import com.example.nhatpham.camerafilter.utils.NONE_CONFIG
+import com.example.nhatpham.camerafilter.utils.getViewModel
 import kotlin.Comparator
 import kotlin.collections.ArrayList
 
@@ -32,7 +32,7 @@ internal class GalleryFragment : Fragment() {
     }
 
     private fun initialize() {
-        mainViewModel = ViewModelProviders.of(activity!!).get(MainViewModel::class.java)
+        mainViewModel = getViewModel(activity!!)
 
         mBinding.rcImages.layoutManager = GridLayoutManager(context, 3, GridLayoutManager.VERTICAL, false)
         mBinding.rcImages.addItemDecoration(SpacesItemDecoration(resources.getDimensionPixelSize(R.dimen.gallery_space_item_size)))

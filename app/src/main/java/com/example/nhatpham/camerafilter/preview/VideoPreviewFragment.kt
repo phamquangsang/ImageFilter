@@ -2,8 +2,8 @@ package com.example.nhatpham.camerafilter.preview
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.arch.lifecycle.LiveData
 import android.arch.lifecycle.Observer
-import android.arch.lifecycle.ViewModelProviders
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
 import android.media.MediaPlayer
@@ -24,6 +24,10 @@ import android.os.Handler
 import android.os.SystemClock
 import android.text.format.DateUtils
 import androidx.core.graphics.applyCanvas
+import androidx.work.OneTimeWorkRequest
+import androidx.work.State
+import androidx.work.WorkManager
+import androidx.work.WorkStatus
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.engine.GlideException
@@ -33,16 +37,13 @@ import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.Target
 import com.example.nhatpham.camerafilter.*
+import com.example.nhatpham.camerafilter.jobs.GenerateFilteredVideoWorker
 import com.example.nhatpham.camerafilter.models.Config
 import com.example.nhatpham.camerafilter.models.Video
 import com.example.nhatpham.camerafilter.models.isFromCamera
 import com.example.nhatpham.camerafilter.utils.*
-import org.wysaid.nativePort.CGEFFmpegNativeLibrary
-import org.wysaid.nativePort.CGENativeLibrary
 import org.wysaid.view.ImageGLSurfaceView
 import java.io.File
-import java.nio.file.Files.delete
-import java.nio.file.Files.exists
 import java.security.MessageDigest
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
@@ -63,7 +64,7 @@ internal class VideoPreviewFragment : Fragment() {
     private lateinit var videoPreviewViewModel: PhotoPreviewViewModel
     private val mainHandler = Handler()
     private var mediaPlayer: MediaPlayer? = null
-    private var scheduler = Executors.newScheduledThreadPool(2)
+    private var scheduler = Executors.newSingleThreadScheduledExecutor()
     private var timeRecordingFuture: ScheduledFuture<*>? = null
 
     private val progressDialogFragment = ProgressDialogFragment()
@@ -96,8 +97,8 @@ internal class VideoPreviewFragment : Fragment() {
     }
 
     private fun initialize() {
-        mainViewModel = ViewModelProviders.of(activity!!).get(MainViewModel::class.java)
-        videoPreviewViewModel = ViewModelProviders.of(this).get(PhotoPreviewViewModel::class.java)
+        mainViewModel = getViewModel(activity!!)
+        videoPreviewViewModel = getViewModel(this)
 
         videoPreviewViewModel.showFiltersEvent.observe(viewLifecycleOwner, Observer { active ->
             showFilters(active ?: false)
@@ -178,17 +179,35 @@ internal class VideoPreviewFragment : Fragment() {
                     mainViewModel.doneEditEvent.value = null
                     return@setOnClickListener
                 }
-                progressDialogFragment.show(fragmentManager, ProgressDialogFragment::class.java.simpleName)
 
-                if(isExternalStorageWritable()) {
-                    scheduler.submit {
-                        val result = generateFilteredVideo(videoPathToSave, currentConfig.value)
-                        mainHandler.post {
-                            progressDialogFragment.dismiss()
+                scheduleGenerateFilteredVideoNow(currentVideo.uri.toString(), currentConfig.value, videoPathToSave)?.observe(viewLifecycleOwner,
+                        Observer { workStatus ->
+                            if(workStatus != null) {
+                                if(workStatus.state.isFinished) {
+                                    progressDialogFragment.dismiss()
+
+                                    if(workStatus.state == State.SUCCEEDED) {
+                                        val outputUri = workStatus.outputData.getString(GenerateFilteredVideoWorker.KEY_RESULT, "")
+                                        if(outputUri != null && !outputUri.isEmpty()) {
+                                            mainViewModel.doneEditEvent.value = Uri.parse(outputUri)
+                                        } else {
+                                            mainViewModel.doneEditEvent.value = null
+                                        }
+                                    } else {
+                                        mainViewModel.doneEditEvent.value = null
+                                    }
+                                } else {
+                                    when (workStatus.state) {
+                                        State.ENQUEUED -> {
+                                            progressDialogFragment.show(fragmentManager, ProgressDialogFragment::class.java.simpleName)
+                                        }
+                                        else -> {
+                                        }
+                                    }
+                                }
+                            }
                         }
-                        mainViewModel.doneEditEvent.postValue(result)
-                    }
-                }
+                )
             } else mainViewModel.doneEditEvent.value = null
         }
 
@@ -254,13 +273,16 @@ internal class VideoPreviewFragment : Fragment() {
         }
     }
 
-    private fun generateFilteredVideo(outputPath: String, config: String): Uri? {
-        val result = CGEFFmpegNativeLibrary.generateVideoWithFilter(outputPath, video?.uri.toString(), config, 1.0f, null, CGENativeLibrary.TextureBlendMode.CGE_BLEND_OVERLAY, 1.0f, false)
-        return if (result) {
-            Uri.fromFile(File(outputPath)).also {
-                reScanFile(it)
-            }
-        } else null
+    private fun scheduleGenerateFilteredVideoNow(inputPath: String, config: String, outputPath: String) : LiveData<WorkStatus>? {
+        val workManager = WorkManager.getInstance()
+        if(workManager != null) {
+            val generateFilteredVideoWorkRequest = OneTimeWorkRequest.Builder(GenerateFilteredVideoWorker::class.java)
+                    .setInputData(GenerateFilteredVideoWorker.data(inputPath, config, outputPath))
+                    .build()
+            workManager.enqueue(generateFilteredVideoWorkRequest)
+            return workManager.getStatusById(generateFilteredVideoWorkRequest.id)
+        }
+        return null
     }
 
     private fun scheduleRecordTime() {
@@ -332,10 +354,9 @@ internal class VideoPreviewFragment : Fragment() {
         }
     }
 
-    private fun reScanFile(videoUri: Uri) {
-        activity?.let {
-            reScanFile(it, videoUri)
-        }
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putParcelable(EXTRA_VIDEO, video)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onResume() {

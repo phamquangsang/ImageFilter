@@ -3,7 +3,6 @@ package com.example.nhatpham.camerafilter.camera
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.arch.lifecycle.Observer
-import android.arch.lifecycle.ViewModelProviders
 import android.content.Context
 import android.databinding.DataBindingUtil
 import android.net.Uri
@@ -43,8 +42,8 @@ internal class CameraFragment : Fragment() {
     private lateinit var modesAdapter: ModesAdapter
 
     private val mainHandler = Handler()
-    private var snapHelper = PagerSnapHelper()
-    private var scheduler = Executors.newSingleThreadScheduledExecutor()
+    private val snapHelper = PagerSnapHelper()
+    private val scheduler = Executors.newSingleThreadScheduledExecutor()
     private var timeRecordingFuture: ScheduledFuture<*>? = null
     private val currentConfig
         get() = cameraViewModel.currentConfigLiveData.value ?: NONE_CONFIG
@@ -56,8 +55,8 @@ internal class CameraFragment : Fragment() {
     }
 
     private fun initialize() {
-        mainViewModel = ViewModelProviders.of(activity!!).get(MainViewModel::class.java)
-        cameraViewModel = ViewModelProviders.of(this).get(CameraViewModel::class.java)
+        mainViewModel = getViewModel(activity!!)
+        cameraViewModel = getViewModel(this)
         mBinding.cameraviewmodel = cameraViewModel
 
         cameraViewModel.showFiltersEvent.observe(viewLifecycleOwner, Observer { active ->
@@ -260,6 +259,11 @@ internal class CameraFragment : Fragment() {
         timeRecordingFuture?.cancel(false)
     }
 
+    override fun onResume() {
+        super.onResume()
+        mBinding.cameraView.onResume()
+    }
+
     override fun onPause() {
         super.onPause()
         CameraInstance.getInstance().stopCamera()
@@ -267,11 +271,6 @@ internal class CameraFragment : Fragment() {
             cameraViewModel.recordingStateLiveData.postValue(false)
         }
         mBinding.cameraView.onPause()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        mBinding.cameraView.onResume()
     }
 
     override fun onStop() {

@@ -3,7 +3,6 @@ package com.example.nhatpham.camerafilter.preview
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.arch.lifecycle.Observer
-import android.arch.lifecycle.ViewModelProviders
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
 import android.net.Uri
@@ -31,9 +30,7 @@ import com.example.nhatpham.camerafilter.models.isFromCamera
 import com.example.nhatpham.camerafilter.models.isFromGallery
 import com.example.nhatpham.camerafilter.utils.*
 import org.wysaid.myUtils.ImageUtil
-import org.wysaid.nativePort.CGEFFmpegNativeLibrary
 import java.io.File
-import java.lang.System.exit
 
 
 internal class PhotoPreviewFragment : Fragment() {
@@ -60,8 +57,8 @@ internal class PhotoPreviewFragment : Fragment() {
     }
 
     private fun initialize() {
-        mainViewModel = ViewModelProviders.of(activity!!).get(MainViewModel::class.java)
-        photoPreviewViewModel = ViewModelProviders.of(this).get(PhotoPreviewViewModel::class.java)
+        mainViewModel = getViewModel(activity!!)
+        photoPreviewViewModel = getViewModel(this)
 
         photoPreviewViewModel.showFiltersEvent.observe(viewLifecycleOwner, Observer { active ->
             showFilters(active ?: false)
