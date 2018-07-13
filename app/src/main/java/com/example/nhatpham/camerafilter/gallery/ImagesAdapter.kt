@@ -41,6 +41,7 @@ internal class ImagesAdapter(private val images: List<GalleryFragment.Thumbnail>
         fun bindData(thumbnail: GalleryFragment.Thumbnail) {
             Glide.with(itemView.context)
                     .load(thumbnail.uri)
+                    .apply(RequestOptions.encodeQualityOf(75))
                     .apply(RequestOptions.centerInsideTransform())
                     .into(mBinding!!.image)
 
