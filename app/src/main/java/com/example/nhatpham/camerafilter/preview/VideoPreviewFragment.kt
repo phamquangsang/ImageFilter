@@ -76,7 +76,7 @@ internal class VideoPreviewFragment : Fragment() {
 
     private val playCompletionCallback = object : VideoPlayerGLSurfaceView.PlayCompletionCallback {
         override fun playComplete(player: MediaPlayer) {
-            cancelScheduleRecordTime()
+            cancelScheduledRecordTime()
             mBinding.videoView.isVisible = false
             showThumbnail(true)
             mBinding.btnPlay.isVisible = true
@@ -295,7 +295,7 @@ internal class VideoPreviewFragment : Fragment() {
         }, 0, 1, TimeUnit.SECONDS)
     }
 
-    private fun cancelScheduleRecordTime() {
+    private fun cancelScheduledRecordTime() {
         mBinding.tvRecordingTime.isVisible = false
         timeRecordingFuture?.cancel(false)
     }
@@ -375,7 +375,7 @@ internal class VideoPreviewFragment : Fragment() {
 
     override fun onStop() {
         super.onStop()
-        cancelScheduleRecordTime()
+        cancelScheduledRecordTime()
     }
 
     override fun onDestroy() {

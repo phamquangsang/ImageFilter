@@ -254,7 +254,7 @@ internal class CameraFragment : Fragment() {
         }, 0, 1, TimeUnit.SECONDS)
     }
 
-    private fun cancelScheduleRecordTime() {
+    private fun cancelScheduledRecordTime() {
         mBinding.tvRecordingTime.isVisible = false
         timeRecordingFuture?.cancel(false)
     }
@@ -275,7 +275,7 @@ internal class CameraFragment : Fragment() {
 
     override fun onStop() {
         super.onStop()
-        cancelScheduleRecordTime()
+        cancelScheduledRecordTime()
     }
 
     override fun onDestroy() {
@@ -289,7 +289,7 @@ internal class CameraFragment : Fragment() {
     }
 
     private fun onFinishRecording(recordedFilePath: String) {
-        cancelScheduleRecordTime()
+        cancelScheduledRecordTime()
 
         val fileUri = Uri.fromFile(File(recordedFilePath)).also {
             context?.run { reScanFile(this, it) }
