@@ -5,7 +5,7 @@ import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 
 
-class ScaledCenterLayoutManager: LinearLayoutManager {
+internal class ScaledCenterLayoutManager: LinearLayoutManager {
 
     private val mShrinkAmount = 0.15f
     private val mShrinkDistance = 0.9f

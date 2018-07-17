@@ -31,99 +31,169 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
 
     public static final String LOG_TAG = Common.LOG_TAG;
 
+    private MediaPlayer mPlayer;
+    private Uri mVideoUri;
+    private PlayerCallback mPlayerCallback;
+    private OnCreateCallback mOnCreateCallback;
+
     private SurfaceTexture mSurfaceTexture;
     private int mVideoTextureID;
     private CGEFrameRenderer mFrameRenderer;
-
-
     private TextureRenderer.Viewport mRenderViewport = new TextureRenderer.Viewport();
+
+    private boolean mFitFullView = false;
+    private int mVideoWidth = 1000;
+    private int mVideoHeight = 1000;
+    private float mMaskAspectRatio = 1.0f;
+    private int mViewWidth = 1000;
+    private int mViewHeight = 1000;
     private float[] mTransformMatrix = new float[16];
     private boolean mIsUsingMask = false;
 
-    public boolean isUsingMask() {
-        return mIsUsingMask;
+    public VideoPlayerGLSurfaceView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+
+        Log.i(LOG_TAG, "MyGLSurfaceView Construct...");
+
+        setEGLContextClientVersion(2);
+        setEGLConfigChooser(8, 8, 8, 8, 8, 0);
+        getHolder().setFormat(PixelFormat.RGBA_8888);
+        setRenderer(this);
+        setRenderMode(RENDERMODE_WHEN_DIRTY);
+        setZOrderOnTop(true);
+        Log.i(LOG_TAG, "MyGLSurfaceView Construct OK...");
     }
 
-    private float mMaskAspectRatio = 1.0f;
+    @Override
+    public void onSurfaceCreated(GL10 gl, EGLConfig config) {
+        Log.i(LOG_TAG, "video player onSurfaceCreated...");
 
-    private int mViewWidth = 1000;
-    private int mViewHeight = 1000;
+        GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+        GLES20.glDisable(GLES20.GL_STENCIL_TEST);
 
-    public int getViewWidth() {
-        return mViewWidth;
+        if (mOnCreateCallback != null) {
+            mOnCreateCallback.createOK();
+        }
+
+        if (mVideoUri != null && (mSurfaceTexture == null || mVideoTextureID == 0)) {
+            mVideoTextureID = Common.genSurfaceTextureID();
+            mSurfaceTexture = new SurfaceTexture(mVideoTextureID);
+            mSurfaceTexture.setOnFrameAvailableListener(this);
+            _useUri();
+        }
     }
 
-    public int getViewheight() {
-        return mViewHeight;
+    @Override
+    public void onSurfaceChanged(GL10 gl, int width, int height) {
+        GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+
+        mViewWidth = width;
+        mViewHeight = height;
+
+        calcViewport();
     }
 
-    private int mVideoWidth = 1000;
-    private int mVideoHeight = 1000;
+    //must be in the OpenGL thread!
+    public void release() {
+        Log.i(LOG_TAG, "Video player view release...");
 
-    private boolean mFitFullView = false;
+        if (mPlayer != null) {
+            queueEvent(new Runnable() {
+                @Override
+                public void run() {
+                    Log.i(LOG_TAG, "Video player view release run...");
+                    if (mPlayer != null) {
+                        mPlayer.setSurface(null);
+                        if (mPlayer.isPlaying())
+                            mPlayer.stop();
+                        mPlayer.release();
+                        mPlayer = null;
+                    }
 
-    public void setFitFullView(boolean fit) {
-        mFitFullView = fit;
-        if (mFrameRenderer != null)
-            calcViewport();
+                    if (mFrameRenderer != null) {
+                        mFrameRenderer.release();
+                        mFrameRenderer = null;
+                    }
+
+                    if (mSurfaceTexture != null) {
+                        mSurfaceTexture.release();
+                        mSurfaceTexture = null;
+                    }
+
+                    if (mVideoTextureID != 0) {
+                        GLES20.glDeleteTextures(1, new int[]{mVideoTextureID}, 0);
+                        mVideoTextureID = 0;
+                    }
+
+                    mIsUsingMask = false;
+                    mPlayerCallback = null;
+
+                    Log.i(LOG_TAG, "Video player view release OK");
+                }
+            });
+        }
     }
 
-    private MediaPlayer mPlayer;
-
-    private Uri mVideoUri;
-
-    public interface PlayerInitializeCallback {
-
-        //对player 进行初始化设置， 设置未默认启动的listener， 比如 bufferupdateListener.
-        void initPlayer(MediaPlayer player);
+    @Override
+    public void onPause() {
+        super.onPause();
+        Log.i(LOG_TAG, "surfaceview onPause ...");
     }
 
-    public void setPlayerInitializeCallback(PlayerInitializeCallback callback) {
-        mPlayerInitCallback = callback;
+    @Override
+    public void onDrawFrame(GL10 gl) {
+        if (mSurfaceTexture == null || mFrameRenderer == null) {
+            return;
+        }
+        mSurfaceTexture.updateTexImage();
+
+        if (!mPlayer.isPlaying() && mPlayer.getCurrentPosition() <= 1) {
+            return;
+        }
+
+        mSurfaceTexture.getTransformMatrix(mTransformMatrix);
+        mFrameRenderer.update(mVideoTextureID, mTransformMatrix);
+        mFrameRenderer.runProc();
+
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+
+        GLES20.glEnable(GLES20.GL_BLEND);
+        mFrameRenderer.render(mRenderViewport.x, mRenderViewport.y, mRenderViewport.width, mRenderViewport.height);
+        GLES20.glDisable(GLES20.GL_BLEND);
     }
 
-    PlayerInitializeCallback mPlayerInitCallback;
+    private long mTimeCount2 = 0;
+    private long mFramesCount2 = 0;
+    private long mLastTimestamp2 = 0;
 
-    public interface PlayPreparedCallback {
-        void playPrepared(MediaPlayer player);
+    @Override
+    public void onFrameAvailable(SurfaceTexture surfaceTexture) {
+        requestRender();
+
+        if (mLastTimestamp2 == 0)
+            mLastTimestamp2 = System.currentTimeMillis();
+
+        long currentTimestamp = System.currentTimeMillis();
+
+        ++mFramesCount2;
+        mTimeCount2 += currentTimestamp - mLastTimestamp2;
+        mLastTimestamp2 = currentTimestamp;
+        if (mTimeCount2 >= 1e3) {
+            Log.i(LOG_TAG, String.format("播放帧率: %d", mFramesCount2));
+            mTimeCount2 -= 1e3;
+            mFramesCount2 = 0;
+        }
     }
 
-    PlayPreparedCallback mPreparedCallback;
-
-    public interface PlayCompletionCallback {
-        void playComplete(MediaPlayer player);
-
-
-        /*
-
-        what 取值: MEDIA_ERROR_UNKNOWN,
-                  MEDIA_ERROR_SERVER_DIED
-
-        extra 取值 MEDIA_ERROR_IO
-                  MEDIA_ERROR_MALFORMED
-                  MEDIA_ERROR_UNSUPPORTED
-                  MEDIA_ERROR_TIMED_OUT
-
-        returning false would cause the 'playComplete' to be called
-        */
-        boolean playFailed(MediaPlayer mp, int what, int extra);
-    }
-
-    PlayCompletionCallback mPlayCompletionCallback;
-
-    public synchronized void setVideoUri(final Uri uri, final PlayPreparedCallback preparedCallback, final PlayCompletionCallback completionCallback) {
-
+    public synchronized void setVideoUri(final Uri uri) {
         mVideoUri = uri;
-        mPreparedCallback = preparedCallback;
-        mPlayCompletionCallback = completionCallback;
 
         if (mFrameRenderer != null) {
-
             queueEvent(new Runnable() {
                 @Override
                 public void run() {
                     Log.i(LOG_TAG, "setVideoUri...");
-
                     if (mSurfaceTexture == null || mVideoTextureID == 0) {
                         mVideoTextureID = Common.genSurfaceTextureID();
                         mSurfaceTexture = new SurfaceTexture(mVideoTextureID);
@@ -139,9 +209,10 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
         queueEvent(new Runnable() {
             @Override
             public void run() {
-
                 if (mFrameRenderer != null) {
                     mFrameRenderer.setFilterWidthConfig(config);
+                    if(mPlayer != null && !mPlayer.isPlaying())
+                        requestRender();
                 } else {
                     Log.e(LOG_TAG, "setFilterWithConfig after release!!");
                 }
@@ -162,8 +233,8 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
         });
     }
 
-    public interface SetMaskBitmapCallback {
-        void setMaskOK(CGEFrameRenderer recorder);
+    public void setPlayerCallback(PlayerCallback playerCallback) {
+        mPlayerCallback = playerCallback;
     }
 
     public void setMaskBitmap(final Bitmap bmp, final boolean shouldRecycle) {
@@ -172,11 +243,9 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
 
     //注意， 当传入的bmp为null时， SetMaskBitmapCallback 不会执行.
     public void setMaskBitmap(final Bitmap bmp, final boolean shouldRecycle, final SetMaskBitmapCallback callback) {
-
         queueEvent(new Runnable() {
             @Override
             public void run() {
-
                 if (mFrameRenderer == null) {
                     Log.e(LOG_TAG, "setMaskBitmap after release!!");
                     return;
@@ -207,6 +276,24 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
         });
     }
 
+    public void setFitFullView(boolean fit) {
+        mFitFullView = fit;
+        if (mFrameRenderer != null)
+            calcViewport();
+    }
+
+    public int getViewWidth() {
+        return mViewWidth;
+    }
+
+    public int getViewheight() {
+        return mViewHeight;
+    }
+
+    public boolean isUsingMask() {
+        return mIsUsingMask;
+    }
+
     public synchronized MediaPlayer getPlayer() {
         if (mPlayer == null) {
             Log.e(LOG_TAG, "Player is not initialized!");
@@ -214,15 +301,8 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
         return mPlayer;
     }
 
-    public interface OnCreateCallback {
-        void createOK();
-    }
-
-    private OnCreateCallback mOnCreateCallback;
-
     //定制一些初始化操作
     public void setOnCreateCallback(final OnCreateCallback callback) {
-
         assert callback != null : "无意义操作!";
 
         if (mFrameRenderer == null) {
@@ -235,154 +315,6 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
                     callback.createOK();
                 }
             });
-        }
-    }
-
-    public VideoPlayerGLSurfaceView(Context context, AttributeSet attrs) {
-        super(context, attrs);
-
-        Log.i(LOG_TAG, "MyGLSurfaceView Construct...");
-
-        setEGLContextClientVersion(2);
-        setEGLConfigChooser(8, 8, 8, 8, 8, 0);
-        getHolder().setFormat(PixelFormat.RGBA_8888);
-        setRenderer(this);
-        setRenderMode(RENDERMODE_WHEN_DIRTY);
-        setZOrderOnTop(true);
-
-        Log.i(LOG_TAG, "MyGLSurfaceView Construct OK...");
-    }
-
-    @Override
-    public void onSurfaceCreated(GL10 gl, EGLConfig config) {
-
-        Log.i(LOG_TAG, "video player onSurfaceCreated...");
-
-        GLES20.glDisable(GLES20.GL_DEPTH_TEST);
-        GLES20.glDisable(GLES20.GL_STENCIL_TEST);
-
-        if (mOnCreateCallback != null) {
-            mOnCreateCallback.createOK();
-        }
-
-        if (mVideoUri != null && (mSurfaceTexture == null || mVideoTextureID == 0)) {
-            mVideoTextureID = Common.genSurfaceTextureID();
-            mSurfaceTexture = new SurfaceTexture(mVideoTextureID);
-            mSurfaceTexture.setOnFrameAvailableListener(VideoPlayerGLSurfaceView.this);
-            _useUri();
-        }
-    }
-
-    @Override
-    public void onSurfaceChanged(GL10 gl, int width, int height) {
-        GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-
-        mViewWidth = width;
-        mViewHeight = height;
-
-        calcViewport();
-    }
-
-    //must be in the OpenGL thread!
-    public void release() {
-
-        Log.i(LOG_TAG, "Video player view release...");
-
-        if (mPlayer != null) {
-            queueEvent(new Runnable() {
-                @Override
-                public void run() {
-
-                    Log.i(LOG_TAG, "Video player view release run...");
-
-                    if (mPlayer != null) {
-
-                        mPlayer.setSurface(null);
-                        if (mPlayer.isPlaying())
-                            mPlayer.stop();
-                        mPlayer.release();
-                        mPlayer = null;
-                    }
-
-                    if (mFrameRenderer != null) {
-                        mFrameRenderer.release();
-                        mFrameRenderer = null;
-                    }
-
-                    if (mSurfaceTexture != null) {
-                        mSurfaceTexture.release();
-                        mSurfaceTexture = null;
-                    }
-
-                    if (mVideoTextureID != 0) {
-                        GLES20.glDeleteTextures(1, new int[]{mVideoTextureID}, 0);
-                        mVideoTextureID = 0;
-                    }
-
-                    mIsUsingMask = false;
-                    mPreparedCallback = null;
-                    mPlayCompletionCallback = null;
-
-                    Log.i(LOG_TAG, "Video player view release OK");
-                }
-            });
-        }
-    }
-
-    @Override
-    public void onPause() {
-        Log.i(LOG_TAG, "surfaceview onPause ...");
-
-        super.onPause();
-    }
-
-    @Override
-    public void onDrawFrame(GL10 gl) {
-
-        if (mSurfaceTexture == null || mFrameRenderer == null) {
-            return;
-        }
-
-        mSurfaceTexture.updateTexImage();
-
-        if (!mPlayer.isPlaying()) {
-            return;
-        }
-
-        mSurfaceTexture.getTransformMatrix(mTransformMatrix);
-        mFrameRenderer.update(mVideoTextureID, mTransformMatrix);
-
-        mFrameRenderer.runProc();
-
-        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
-
-        GLES20.glEnable(GLES20.GL_BLEND);
-        mFrameRenderer.render(mRenderViewport.x, mRenderViewport.y, mRenderViewport.width, mRenderViewport.height);
-        GLES20.glDisable(GLES20.GL_BLEND);
-
-    }
-
-    private long mTimeCount2 = 0;
-    private long mFramesCount2 = 0;
-    private long mLastTimestamp2 = 0;
-
-    @Override
-    public void onFrameAvailable(SurfaceTexture surfaceTexture) {
-        requestRender();
-
-        if (mLastTimestamp2 == 0)
-            mLastTimestamp2 = System.currentTimeMillis();
-
-        long currentTimestamp = System.currentTimeMillis();
-
-        ++mFramesCount2;
-        mTimeCount2 += currentTimestamp - mLastTimestamp2;
-        mLastTimestamp2 = currentTimestamp;
-        if (mTimeCount2 >= 1e3) {
-            Log.i(LOG_TAG, String.format("播放帧率: %d", mFramesCount2));
-            mTimeCount2 -= 1e3;
-            mFramesCount2 = 0;
         }
     }
 
@@ -428,12 +360,9 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
     }
 
     private void _useUri() {
-
         if (mPlayer != null) {
-
             mPlayer.stop();
             mPlayer.reset();
-
         } else {
             mPlayer = new MediaPlayer();
         }
@@ -441,18 +370,17 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
         try {
             mPlayer.setDataSource(getContext(), mVideoUri);
             mPlayer.setSurface(new Surface(mSurfaceTexture));
-
         } catch (Exception e) {
             e.printStackTrace();
             Log.e(LOG_TAG, "useUri failed");
 
-            if (mPlayCompletionCallback != null) {
+            if (mPlayerCallback != null) {
                 this.post(new Runnable() {
                     @Override
                     public void run() {
-                        if (mPlayCompletionCallback != null) {
-                            if (!mPlayCompletionCallback.playFailed(mPlayer, MediaPlayer.MEDIA_ERROR_UNKNOWN, MediaPlayer.MEDIA_ERROR_UNSUPPORTED))
-                                mPlayCompletionCallback.playComplete(mPlayer);
+                        if (mPlayerCallback != null) {
+                            if (!mPlayerCallback.playFailed(mPlayer, MediaPlayer.MEDIA_ERROR_UNKNOWN, MediaPlayer.MEDIA_ERROR_UNSUPPORTED))
+                                mPlayerCallback.playComplete(mPlayer);
                         }
                     }
                 });
@@ -460,15 +388,15 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
             return;
         }
 
-        if (mPlayerInitCallback != null) {
-            mPlayerInitCallback.initPlayer(mPlayer);
+        if (mPlayerCallback != null) {
+            mPlayerCallback.initPlayer(mPlayer);
         }
 
         mPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(MediaPlayer mp) {
-                if (mPlayCompletionCallback != null) {
-                    mPlayCompletionCallback.playComplete(mPlayer);
+                if (mPlayerCallback != null) {
+                    mPlayerCallback.playComplete(mPlayer);
                 }
                 Log.i(LOG_TAG, "Video Play Over");
             }
@@ -483,7 +411,6 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
                 queueEvent(new Runnable() {
                     @Override
                     public void run() {
-
                         if (mFrameRenderer == null) {
                             mFrameRenderer = new CGEFrameRenderer();
                         }
@@ -495,17 +422,13 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
                         } else {
                             Log.e(LOG_TAG, "Frame Recorder init failed!");
                         }
-
                         calcViewport();
                     }
                 });
 
-                if (mPreparedCallback != null) {
-                    mPreparedCallback.playPrepared(mPlayer);
-                } else {
-                    mp.start();
+                if (mPlayerCallback != null) {
+                    mPlayerCallback.playPrepared(mPlayer);
                 }
-
                 Log.i(LOG_TAG, String.format("Video resolution 1: %d x %d", mVideoWidth, mVideoHeight));
             }
         });
@@ -513,9 +436,8 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
         mPlayer.setOnErrorListener(new MediaPlayer.OnErrorListener() {
             @Override
             public boolean onError(MediaPlayer mp, int what, int extra) {
-
-                if (mPlayCompletionCallback != null)
-                    return mPlayCompletionCallback.playFailed(mp, what, extra);
+                if (mPlayerCallback != null)
+                    return mPlayerCallback.playFailed(mp, what, extra);
                 return false;
             }
         });
@@ -524,24 +446,19 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
             mPlayer.prepareAsync();
         } catch (Exception e) {
             Log.i(LOG_TAG, String.format("Error handled: %s, play failure handler would be called!", e.toString()));
-            if (mPlayCompletionCallback != null) {
-                this.post(new Runnable() {
+            if (mPlayerCallback != null) {
+                post(new Runnable() {
                     @Override
                     public void run() {
-                        if (mPlayCompletionCallback != null) {
-                            if (!mPlayCompletionCallback.playFailed(mPlayer, MediaPlayer.MEDIA_ERROR_UNKNOWN, MediaPlayer.MEDIA_ERROR_UNSUPPORTED))
-                                mPlayCompletionCallback.playComplete(mPlayer);
+                        if (mPlayerCallback != null) {
+                            if (!mPlayerCallback.playFailed(mPlayer, MediaPlayer.MEDIA_ERROR_UNKNOWN, MediaPlayer.MEDIA_ERROR_UNSUPPORTED))
+                                mPlayerCallback.playComplete(mPlayer);
                         }
                     }
                 });
             }
         }
 
-    }
-
-    public interface TakeShotCallback {
-        //传入的bmp可以由接收者recycle
-        void takeShotOK(Bitmap bmp);
     }
 
     public synchronized void takeShot(final TakeShotCallback callback) {
@@ -556,7 +473,6 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
         queueEvent(new Runnable() {
             @Override
             public void run() {
-
                 IntBuffer buffer = IntBuffer.allocate(mRenderViewport.width * mRenderViewport.height);
 
                 GLES20.glReadPixels(mRenderViewport.x, mRenderViewport.y, mRenderViewport.width, mRenderViewport.height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buffer);
@@ -577,6 +493,41 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
                 callback.takeShotOK(bmp2);
             }
         });
+    }
 
+    public interface PlayerCallback {
+
+        //对player 进行初始化设置， 设置未默认启动的listener， 比如 bufferupdateListener.
+        void initPlayer(MediaPlayer player);
+
+        void playPrepared(MediaPlayer player);
+
+        void playComplete(MediaPlayer player);
+
+        /*
+        what 取值: MEDIA_ERROR_UNKNOWN,
+                  MEDIA_ERROR_SERVER_DIED
+
+        extra 取值 MEDIA_ERROR_IO
+                  MEDIA_ERROR_MALFORMED
+                  MEDIA_ERROR_UNSUPPORTED
+                  MEDIA_ERROR_TIMED_OUT
+
+        returning false would cause the 'playComplete' to be called
+        */
+        boolean playFailed(MediaPlayer mp, int what, int extra);
+    }
+
+    public interface OnCreateCallback {
+        void createOK();
+    }
+
+    public interface SetMaskBitmapCallback {
+        void setMaskOK(CGEFrameRenderer recorder);
+    }
+
+    public interface TakeShotCallback {
+        //传入的bmp可以由接收者recycle
+        void takeShotOK(Bitmap bmp);
     }
 }

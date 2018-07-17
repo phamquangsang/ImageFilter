@@ -8,5 +8,6 @@ import com.example.nhatpham.camerafilter.utils.NONE_CONFIG
 internal class VideoPreviewViewModel : ViewModel() {
 
     val showFiltersEvent = MutableLiveData<Boolean>()
+    val showThumbnailEvent = MutableLiveData<Boolean>().apply { value = true }
     val currentConfigLiveData = MutableLiveData<Config>().apply { value = NONE_CONFIG }
 }

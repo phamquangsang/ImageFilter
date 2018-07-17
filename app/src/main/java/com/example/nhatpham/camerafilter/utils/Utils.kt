@@ -1,3 +1,5 @@
+@file:JvmName("Utils")
+
 package com.example.nhatpham.camerafilter.utils
 
 import android.app.Activity
@@ -7,6 +9,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.database.Cursor
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.support.v4.app.ActivityCompat
@@ -152,3 +155,22 @@ internal fun Any.toJson() = gSon.toJson(this)
 internal inline fun <reified T : ViewModel> getViewModel(fragmentActivity: FragmentActivity) = ViewModelProviders.of(fragmentActivity).get(T::class.java)
 
 internal inline fun <reified T : ViewModel> getViewModel(fragment: Fragment) = ViewModelProviders.of(fragment).get(T::class.java)
+
+internal fun getPathFromMediaUri(context: Context, uri: Uri): String? {
+    if(!isMediaStoreUri(uri)) return null
+
+    var cursor: Cursor? = null
+    val projection = arrayOf(MediaStore.MediaColumns.DATA)
+
+    try {
+        cursor = context.contentResolver.query(uri, projection, null, null, null)
+        if (cursor != null && cursor.moveToFirst()) {
+            val index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
+            return cursor.getString(index)
+        }
+    } finally {
+        if (cursor != null)
+            cursor.close()
+    }
+    return null
+}
