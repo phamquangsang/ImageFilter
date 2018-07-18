@@ -26,9 +26,7 @@ import android.support.v4.app.FragmentActivity
 import android.view.View
 import android.view.ViewTreeObserver
 import com.example.nhatpham.camerafilter.models.Config
-import com.google.gson.Gson
 import java.io.File
-import java.lang.ref.WeakReference
 import kotlin.collections.ArrayList
 
 const val APP_NAME = "Mingle"
@@ -138,20 +136,6 @@ internal inline fun <T: View> T.afterMeasured(crossinline f: T.() -> Unit) {
     })
 }
 
-private var gSonWeakRef = WeakReference<Gson>(Gson())
-
-internal val gSon : Gson
-get() {
-    var gSon = gSonWeakRef.get()
-    if(gSon == null) {
-        gSon = Gson()
-        gSonWeakRef = WeakReference(gSon)
-    }
-    return gSon
-}
-
-internal fun Any.toJson() = gSon.toJson(this)
-
 internal inline fun <reified T : ViewModel> getViewModel(fragmentActivity: FragmentActivity) = ViewModelProviders.of(fragmentActivity).get(T::class.java)
 
 internal inline fun <reified T : ViewModel> getViewModel(fragment: Fragment) = ViewModelProviders.of(fragment).get(T::class.java)
@@ -165,8 +149,7 @@ internal fun getPathFromMediaUri(context: Context, uri: Uri): String? {
     try {
         cursor = context.contentResolver.query(uri, projection, null, null, null)
         if (cursor != null && cursor.moveToFirst()) {
-            val index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
-            return cursor.getString(index)
+            return cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA))
         }
     } finally {
         if (cursor != null)

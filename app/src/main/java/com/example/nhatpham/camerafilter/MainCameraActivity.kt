@@ -15,6 +15,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.Window
 import android.view.WindowManager
+import android.webkit.MimeTypeMap
 import com.example.nhatpham.camerafilter.camera.CameraFragment
 import com.example.nhatpham.camerafilter.gallery.GalleryFragment
 import com.example.nhatpham.camerafilter.models.Config
@@ -23,13 +24,13 @@ import com.example.nhatpham.camerafilter.models.Source
 import com.example.nhatpham.camerafilter.models.Video
 import com.example.nhatpham.camerafilter.preview.PhotoPreviewFragment
 import com.example.nhatpham.camerafilter.preview.VideoPreviewFragment
-import com.example.nhatpham.camerafilter.utils.EFFECT_CONFIGS
-import com.example.nhatpham.camerafilter.utils.NONE_CONFIG
+import com.example.nhatpham.camerafilter.utils.*
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import org.wysaid.common.Common
 import org.wysaid.nativePort.CGENativeLibrary
 import java.io.*
+import java.net.URLConnection
 import kotlin.math.absoluteValue
 
 class MainCameraActivity : AppCompatActivity() {
@@ -109,9 +110,17 @@ class MainCameraActivity : AppCompatActivity() {
         }
         if (!checkToRequestPermissions()) {
             if (savedInstanceState == null) {
-                if (intent.hasExtra(EXTRA_PHOTO_URI)) {
-                    val photoUri : Uri = intent.getParcelableExtra(EXTRA_PHOTO_URI)
-                    showPhotoPreviewFragment(Photo(photoUri, NONE_CONFIG, Source.NONE), false)
+                if (intent.data != null) {
+                    val mediaUri = intent.data
+                    when {
+                        checkUriMimeType(this, mediaUri, ofImage()) || ofImage().any { it.toString() == intent.type } -> {
+                            showPhotoPreviewFragment(Photo(mediaUri, NONE_CONFIG, Source.NONE), false)
+                        }
+                        checkUriMimeType(this, mediaUri, ofVideo()) || ofVideo().any { it.toString() == intent.type } -> {
+                            showVideoPreviewFragment(Video(mediaUri, NONE_CONFIG, Source.NONE), false)
+                        }
+                        else -> finish()
+                    }
                 } else {
                     showCameraFragment()
                 }
@@ -169,11 +178,13 @@ class MainCameraActivity : AppCompatActivity() {
 
     companion object {
         private const val REQUEST_PERMISSIONS = 1
-        private const val EXTRA_PHOTO_URI = "EXTRA_PHOTO_URI"
 
-        fun newIntent(context: Context, photoUri: Uri) =
+        @JvmOverloads
+        @JvmStatic
+        fun newIntent(context: Context, mediaUri: Uri, type: String = "") =
                 Intent(context, MainCameraActivity::class.java).apply {
-                    putExtra(EXTRA_PHOTO_URI, photoUri)
+                    this.data = mediaUri
+                    this.type = type
                 }
     }
 }

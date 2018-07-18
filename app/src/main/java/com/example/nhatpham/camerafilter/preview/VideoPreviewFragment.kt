@@ -74,7 +74,7 @@ internal class VideoPreviewFragment : Fragment() {
     private val currentConfig
         get() = videoPreviewViewModel.currentConfigLiveData.value ?: NONE_CONFIG
     private var lastIntervalUpdate = 0L
-    private var isCompleted = false
+    private var isCompleted = true
     private val playListener = PlayListener()
 
     private val updateTimeIntervalTask = Runnable {
@@ -134,7 +134,7 @@ internal class VideoPreviewFragment : Fragment() {
         videoPreviewViewModel.currentConfigLiveData.observe(viewLifecycleOwner, Observer { newConfig ->
             if (newConfig != null) {
                 val currentPlayer = mediaPlayer
-                if (currentPlayer != null && currentPlayer.isStopped()) {
+                if (currentPlayer == null || currentPlayer.isStopped()) {
                     showThumbnail(true)
                 }
                 mBinding.videoView.setFilterWithConfig(newConfig.value)
