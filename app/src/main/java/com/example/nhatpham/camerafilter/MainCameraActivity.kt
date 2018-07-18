@@ -182,9 +182,6 @@ class MainCameraActivity : AppCompatActivity() {
         @JvmOverloads
         @JvmStatic
         fun newIntent(context: Context, mediaUri: Uri, type: String = "") =
-                Intent(context, MainCameraActivity::class.java).apply {
-                    this.data = mediaUri
-                    this.type = type
-                }
+                Intent(context, MainCameraActivity::class.java).setDataAndType(mediaUri, type)
     }
 }
