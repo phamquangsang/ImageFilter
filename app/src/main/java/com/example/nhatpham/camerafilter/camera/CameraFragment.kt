@@ -152,7 +152,7 @@ internal class CameraFragment : Fragment() {
         }
 
         mBinding.cameraView.apply {
-            setPictureSize(2048, 1536, true)
+            setPictureSize(1280, 960, true)
             setZOrderOnTop(false)
             setZOrderMediaOverlay(true)
             setOnCreateCallback {

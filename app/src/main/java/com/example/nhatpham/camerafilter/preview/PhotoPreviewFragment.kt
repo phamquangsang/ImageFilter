@@ -31,6 +31,7 @@ import com.example.nhatpham.camerafilter.models.isFromGallery
 import com.example.nhatpham.camerafilter.utils.*
 import org.wysaid.myUtils.ImageUtil
 import java.io.File
+import java.lang.System.exit
 
 
 internal class PhotoPreviewFragment : Fragment() {
@@ -100,22 +101,26 @@ internal class PhotoPreviewFragment : Fragment() {
         }
 
         mBinding.btnDone.setOnClickListener {
-            if (photo == null) {
-                exit()
-                return@setOnClickListener
-            }
-
             mBinding.imageView.getResultBitmap { bitmap ->
                 val currentPhoto = photo
                 if (bitmap != null && currentPhoto != null) {
                     val photoUri = currentPhoto.uri
-                    if (isMediaStoreImageUri(photoUri) || isFileUri(photoUri) ||
-                            URLUtil.isHttpUrl(photoUri.toString()) || URLUtil.isHttpsUrl(photoUri.toString())) {
 
-                        if (currentPhoto.isFromGallery() && currentConfig == NONE_CONFIG) {
-                            mainViewModel.doneEditEvent.postValue(currentPhoto.uri)
+                    if (currentPhoto.isFromGallery() && currentConfig == NONE_CONFIG) {
+                        val inputPath = when {
+                            isMediaStoreImageUri(photoUri) -> getPathFromMediaUri(context!!, photoUri)
+                            isFileUri(photoUri) -> photoUri.path
+                            else -> null
+                        }
+                        if (inputPath != null) {
+                            mainViewModel.doneEditEvent.postValue(Uri.parse(inputPath))
                         } else {
-                            if(isExternalStorageWritable()) {
+                            mainViewModel.doneEditEvent.postValue(null)
+                        }
+                    } else {
+                        if (isMediaStoreImageUri(photoUri) || isFileUri(photoUri) ||
+                                URLUtil.isHttpUrl(photoUri.toString()) || URLUtil.isHttpsUrl(photoUri.toString())) {
+                            if (isExternalStorageWritable()) {
                                 val filePath = ImageUtil.saveBitmap(bitmap, imagePathToSave)
                                 if (!filePath.isNullOrEmpty()) {
                                     mainViewModel.doneEditEvent.postValue(Uri.fromFile(File(filePath)).also {
@@ -123,16 +128,15 @@ internal class PhotoPreviewFragment : Fragment() {
                                     })
                                 }
                             }
+                        } else {
+                            mainViewModel.doneEditEvent.postValue(null)
                         }
-                    } else {
-                        mainViewModel.doneEditEvent.postValue(null)
                     }
                 } else {
                     mainViewModel.doneEditEvent.postValue(null)
                 }
             }
         }
-
         mBinding.btnBack.setOnClickListener { exit() }
 
         mBinding.imageView.afterMeasured {

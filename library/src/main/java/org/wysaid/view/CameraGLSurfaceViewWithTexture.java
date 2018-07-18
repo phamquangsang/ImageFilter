@@ -255,7 +255,6 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
         queueEvent(new Runnable() {
             @Override
             public void run() {
-
                 FrameBufferObject frameBufferObject = new FrameBufferObject();
                 int bufferTexID;
                 IntBuffer buffer;
@@ -422,10 +421,8 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
                             mat.postScale(-1.0f, -1.0f);
                             mat.postTranslate(width / 2, height / 2);
                         }
-
                         canvas.drawBitmap(bmp, mat, null);
                     }
-
                 }
 
                 if (config != null) {
