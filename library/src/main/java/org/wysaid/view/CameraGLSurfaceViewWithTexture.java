@@ -16,12 +16,13 @@ import android.media.ExifInterface;
 import android.opengl.GLES20;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.OrientationEventListener;
+import android.view.Surface;
 
 import org.wysaid.camera.CameraInstance;
 import org.wysaid.common.Common;
 import org.wysaid.common.FrameBufferObject;
 import org.wysaid.nativePort.CGEFrameRecorder;
-import org.wysaid.nativePort.CGEFrameRenderer;
 import org.wysaid.nativePort.CGENativeLibrary;
 
 import java.io.BufferedOutputStream;
@@ -42,58 +43,36 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
     protected boolean mIsTransformMatrixSet = false;
     protected CGEFrameRecorder mOriginFrameRecorder;
     protected CGEFrameRecorder mFrameRecorder;
-
-    public CGEFrameRecorder getRecorder() {
-        return mFrameRecorder;
-    }
-
-
-    public synchronized void setFilterWithConfig(final String config) {
-        queueEvent(new Runnable() {
-            @Override
-            public void run() {
-
-                if (mFrameRecorder != null) {
-                    mOriginFrameRecorder.setFilterWidthConfig("");
-                    mFrameRecorder.setFilterWidthConfig(config);
-                } else {
-                    Log.e(LOG_TAG, "setFilterWithConfig after release!!");
-                }
-            }
-        });
-    }
-
-    public void setFilterIntensity(final float intensity) {
-        queueEvent(new Runnable() {
-            @Override
-            public void run() {
-                if (mFrameRecorder != null) {
-                    mOriginFrameRecorder.setFilterIntensity(intensity);
-                    mFrameRecorder.setFilterIntensity(intensity);
-                } else {
-                    Log.e(LOG_TAG, "setFilterIntensity after release!!");
-                }
-            }
-        });
-    }
-
-    //定制一些初始化操作
-    public void setOnCreateCallback(final OnCreateCallback callback) {
-        if (mFrameRecorder == null || callback == null) {
-            mOnCreateCallback = callback;
-        } else {
-            // Already created, just run.
-            queueEvent(new Runnable() {
-                @Override
-                public void run() {
-                    callback.createOver();
-                }
-            });
-        }
-    }
+    protected CameraReadyCallback mCameraReadyCallback;
+    private OrientationEventListener mOrientationEventListener;
+    private int lastOrientation = Surface.ROTATION_0;
 
     public CameraGLSurfaceViewWithTexture(Context context, AttributeSet attrs) {
         super(context, attrs);
+        mOrientationEventListener = new OrientationEventListener(context) {
+            @Override
+            public void onOrientationChanged(int orientation) {
+                if (orientation < 0) {
+                    return; // Flip screen, Not take account
+                }
+                int curOrientation;
+
+                if (orientation <= 45) {
+                    curOrientation = Surface.ROTATION_0;
+                } else if (orientation <= 135) {
+                    curOrientation = Surface.ROTATION_90;
+                } else if (orientation <= 225) {
+                    curOrientation = Surface.ROTATION_180;
+                } else if (orientation <= 315) {
+                    curOrientation = Surface.ROTATION_270;
+                } else {
+                    curOrientation = Surface.ROTATION_0;
+                }
+                if (curOrientation != lastOrientation) {
+                    lastOrientation = curOrientation;
+                }
+            }
+        };
     }
 
     @Override
@@ -121,21 +100,29 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
         mSurfaceTexture.setOnFrameAvailableListener(this);
 
         super.onSurfaceCreated(gl, config);
+
+        if (mOrientationEventListener != null && mOrientationEventListener.canDetectOrientation()) {
+            mOrientationEventListener.enable();
+        }
     }
 
     protected void onRelease() {
         super.onRelease();
-        if(mSurfaceTexture != null) {
+        if (mOrientationEventListener != null) {
+            mOrientationEventListener.disable();
+        }
+
+        if (mSurfaceTexture != null) {
             mSurfaceTexture.release();
             mSurfaceTexture = null;
         }
 
-        if(mTextureID != 0) {
+        if (mTextureID != 0) {
             Common.deleteTextureID(mTextureID);
             mTextureID = 0;
         }
 
-        if(mFrameRecorder != null) {
+        if (mFrameRecorder != null) {
             mOriginFrameRecorder.release();
             mOriginFrameRecorder = null;
             mFrameRecorder.release();
@@ -154,20 +141,20 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
     }
 
     public void resumePreview() {
-
         if (mFrameRecorder == null) {
             Log.e(LOG_TAG, "resumePreview after release!!");
             return;
         }
-
         if (!cameraInstance().isCameraOpened()) {
-
             int facing = mIsCameraBackForward ? Camera.CameraInfo.CAMERA_FACING_BACK : Camera.CameraInfo.CAMERA_FACING_FRONT;
 
             cameraInstance().tryOpenCamera(new CameraInstance.CameraOpenCallback() {
                 @Override
                 public void cameraReady() {
                     Log.i(LOG_TAG, "tryOpenCamera OK...");
+                    if (mCameraReadyCallback != null) {
+                        mCameraReadyCallback.cameraReady();
+                    }
                 }
             }, facing);
         }
@@ -177,7 +164,6 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
             mOriginFrameRecorder.srcResize(cameraInstance().previewHeight(), cameraInstance().previewWidth());
             mFrameRecorder.srcResize(cameraInstance().previewHeight(), cameraInstance().previewWidth());
         }
-
         requestRender();
     }
 
@@ -185,7 +171,6 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
 
     @Override
     public void onDrawFrame(GL10 gl) {
-
         if (mSurfaceTexture == null || !cameraInstance().isPreviewing()) {
             return;
         }
@@ -200,7 +185,7 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
         mOriginFrameRecorder.runProc();
 
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
-        GLES20.glClearColor(0,0,0,0);
+        GLES20.glClearColor(0, 0, 0, 0);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
 
         mOriginFrameRecorder.render(mDrawViewport.x, mDrawViewport.y, mDrawViewport.width, mDrawViewport.height);
@@ -213,7 +198,6 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
 
     @Override
     public void onFrameAvailable(SurfaceTexture surfaceTexture) {
-
         requestRender();
 
 //        if (mLastTimestamp2 == 0)
@@ -234,7 +218,7 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
     @Override
     protected void onSwitchCamera() {
         super.onSwitchCamera();
-        if(mFrameRecorder != null) {
+        if (mFrameRecorder != null) {
             mOriginFrameRecorder.setSrcRotation((float) (Math.PI / 2.0));
             mOriginFrameRecorder.setRenderFlipScale(1.0f, -1.0f);
             mFrameRecorder.setSrcRotation((float) (Math.PI / 2.0));
@@ -276,18 +260,73 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
                 callback.takePictureOK(bmp);
             }
         });
-
     }
 
-    //isBigger 为true 表示当宽高不满足时，取最近的较大值.
+    public CGEFrameRecorder getRecorder() {
+        return mFrameRecorder;
+    }
+
+    public synchronized void setFilterWithConfig(final String config) {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                if (mFrameRecorder != null) {
+                    mOriginFrameRecorder.setFilterWidthConfig("");
+                    mFrameRecorder.setFilterWidthConfig(config);
+                } else {
+                    Log.e(LOG_TAG, "setFilterWithConfig after release!!");
+                }
+            }
+        });
+    }
+
+    public void setFilterIntensity(final float intensity) {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                if (mFrameRecorder != null) {
+                    mOriginFrameRecorder.setFilterIntensity(intensity);
+                    mFrameRecorder.setFilterIntensity(intensity);
+                } else {
+                    Log.e(LOG_TAG, "setFilterIntensity after release!!");
+                }
+            }
+        });
+    }
+
+    //定制一些初始化操作
+    public void setOnCreateCallback(final OnCreateCallback callback) {
+        if (mFrameRecorder == null || callback == null) {
+            mOnCreateCallback = callback;
+        } else {
+            // Already created, just run.
+            queueEvent(new Runnable() {
+                @Override
+                public void run() {
+                    callback.createOver();
+                }
+            });
+        }
+    }
+
+    public void setCameraReadyCallback(CameraReadyCallback cameraReadyCallback) {
+        mCameraReadyCallback = cameraReadyCallback;
+    }
+
+    // isBigger 为true 表示当宽高不满足时，取最近的较大值.
     // 若为 false 则取较小的
     public void setPictureSize(int width, int height, boolean isBigger) {
         //默认会旋转90度.
-        cameraInstance().setPictureSize(height, width, isBigger);
+        cameraInstance().setPictureSize(width, height, isBigger);
     }
 
-    public synchronized void takePicture(final TakePictureCallback photoCallback, Camera.ShutterCallback shutterCallback, final String config, final float intensity, final boolean isFrontMirror) {
+    public void setJpegQuality(int quality) {
+        cameraInstance().setJpegQuality(quality);
+    }
 
+    public synchronized void takePicture(final TakePictureCallback photoCallback,
+                                         final Camera.ShutterCallback shutterCallback,
+                                         final String config, final float intensity, final boolean isFrontMirror) {
         Camera.Parameters params = cameraInstance().getParams();
 
         if (photoCallback == null || params == null) {
@@ -303,19 +342,15 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
             cameraInstance().setParams(params);
         } catch (Exception e) {
             Log.e(LOG_TAG, "Error when takePicture: " + e.toString());
-            if (photoCallback != null) {
-                photoCallback.takePictureOK(null);
-            }
+            photoCallback.takePictureOK(null);
             return;
         }
 
         cameraInstance().getCameraDevice().takePicture(shutterCallback, null, new Camera.PictureCallback() {
             @Override
             public void onPictureTaken(final byte[] data, Camera camera) {
-
                 Camera.Parameters params = camera.getParameters();
                 Camera.Size sz = params.getPictureSize();
-
                 boolean shouldRotate;
 
                 Bitmap bmp;
@@ -377,14 +412,23 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
                 Bitmap bmp2;
 
                 if (shouldRotate) {
-                    bmp2 = Bitmap.createBitmap(height, width, Bitmap.Config.ARGB_8888);
+                    bmp2 = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
 
                     Canvas canvas = new Canvas(bmp2);
 
                     if (cameraInstance().getFacing() == Camera.CameraInfo.CAMERA_FACING_BACK) {
                         Matrix mat = new Matrix();
-                        int halfLen = Math.min(width, height) / 2;
-                        mat.setRotate(90, halfLen, halfLen);
+                        int degrees = Surface.ROTATION_0;
+                        if (lastOrientation == Surface.ROTATION_0) {
+                            degrees = 0;
+                        } else if (lastOrientation == Surface.ROTATION_90) {
+                            degrees = 90;
+                        } else if (lastOrientation == Surface.ROTATION_180) {
+                            degrees = 180;
+                        } else if (lastOrientation == Surface.ROTATION_270) {
+                            degrees = 270;
+                        }
+                        mat.setRotate(degrees, width/2, height/2);
                         canvas.drawBitmap(bmp, mat, null);
                     } else {
                         Matrix mat = new Matrix();
@@ -408,7 +452,6 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
                     if (cameraInstance().getFacing() == Camera.CameraInfo.CAMERA_FACING_BACK) {
                         bmp2 = bmp;
                     } else {
-
                         bmp2 = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
                         Canvas canvas = new Canvas(bmp2);
                         Matrix mat = new Matrix();
@@ -428,11 +471,15 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
                 if (config != null) {
                     CGENativeLibrary.filterImage_MultipleEffectsWriteBack(bmp2, config, intensity);
                 }
-
                 photoCallback.takePictureOK(bmp2);
 
                 cameraInstance().getCameraDevice().startPreview();
             }
         });
+    }
+
+    public interface CameraReadyCallback {
+
+        void cameraReady();
     }
 }

@@ -151,12 +151,15 @@ internal class CameraFragment : Fragment() {
             cameraViewModel.cameraBackForwardLiveData.value = mBinding.cameraView.isCameraBackForward
         }
 
-        mBinding.cameraView.apply {
-            setPictureSize(1280, 960, true)
-            setZOrderOnTop(false)
-            setZOrderMediaOverlay(true)
-            setOnCreateCallback {
-                setFilterWithConfig(currentConfig.value)
+
+        mBinding.cameraView.setOnCreateCallback {
+            mBinding.cameraView.setFilterWithConfig(currentConfig.value)
+        }
+        mBinding.root.afterMeasured {
+            mBinding.cameraView.setCameraReadyCallback {
+                mBinding.cameraView.setPictureSize(width, height, true)
+                mBinding.cameraView.setZOrderOnTop(false)
+                mBinding.cameraView.setZOrderMediaOverlay(true)
             }
         }
     }

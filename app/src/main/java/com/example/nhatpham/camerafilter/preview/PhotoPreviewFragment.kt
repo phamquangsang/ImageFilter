@@ -31,7 +31,6 @@ import com.example.nhatpham.camerafilter.models.isFromGallery
 import com.example.nhatpham.camerafilter.utils.*
 import org.wysaid.myUtils.ImageUtil
 import java.io.File
-import java.lang.System.exit
 
 
 internal class PhotoPreviewFragment : Fragment() {
