@@ -12,6 +12,8 @@ import android.content.pm.PackageManager
 import android.database.Cursor
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
+import android.net.ConnectivityManager
+import android.net.NetworkInfo
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.util.DisplayMetrics
@@ -156,4 +158,9 @@ internal fun getPathFromMediaUri(context: Context, uri: Uri): String? {
             cursor.close()
     }
     return null
+}
+
+internal fun isNetworkConnected(context: Context) : Boolean {
+    val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    return connectivityManager.activeNetworkInfo?.isConnectedOrConnecting == true
 }

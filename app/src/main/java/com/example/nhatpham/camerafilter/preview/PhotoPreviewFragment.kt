@@ -21,6 +21,7 @@ import com.example.nhatpham.camerafilter.databinding.FragmentPhotoPreviewBinding
 import org.wysaid.view.ImageGLSurfaceView
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.webkit.URLUtil
+import android.widget.Toast
 import androidx.core.view.isVisible
 import com.bumptech.glide.request.RequestOptions
 import com.example.nhatpham.camerafilter.*
@@ -111,24 +112,20 @@ internal class PhotoPreviewFragment : Fragment() {
                             isFileUri(photoUri) -> photoUri.path
                             else -> null
                         }
-                        if (inputPath != null) {
+                        if (inputPath != null)
                             mainViewModel.doneEditEvent.postValue(Uri.parse(inputPath))
-                        } else {
+                        else
                             mainViewModel.doneEditEvent.postValue(null)
-                        }
                     } else {
-                        if (isMediaStoreImageUri(photoUri) || isFileUri(photoUri) ||
-                                URLUtil.isHttpUrl(photoUri.toString()) || URLUtil.isHttpsUrl(photoUri.toString())) {
-                            if (isExternalStorageWritable()) {
-                                val filePath = ImageUtil.saveBitmap(bitmap, imagePathToSave)
-                                if (!filePath.isNullOrEmpty()) {
-                                    mainViewModel.doneEditEvent.postValue(Uri.fromFile(File(filePath)).also {
-                                        reScanFile(it)
-                                    })
-                                }
+                        if (isExternalStorageWritable()) {
+                            val filePath = ImageUtil.saveBitmap(bitmap, imagePathToSave)
+                            if (!filePath.isNullOrEmpty()) {
+                                mainViewModel.doneEditEvent.postValue(Uri.fromFile(File(filePath)).also {
+                                    reScanFile(it)
+                                })
+                            } else {
+                                Toast.makeText(context, "Cannot save", Toast.LENGTH_SHORT).show()
                             }
-                        } else {
-                            mainViewModel.doneEditEvent.postValue(null)
                         }
                     }
                 } else {
@@ -221,7 +218,11 @@ internal class PhotoPreviewFragment : Fragment() {
     }
 
     private fun exit() {
-        activity?.supportFragmentManager?.popBackStack()
+        activity?.run {
+            if(supportFragmentManager.backStackEntryCount == 0)
+                finish()
+            else supportFragmentManager.popBackStack()
+        }
     }
 
     override fun onPause() {

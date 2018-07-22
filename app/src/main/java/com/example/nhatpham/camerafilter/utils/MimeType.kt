@@ -113,12 +113,3 @@ internal fun ofVideo(): Set<MimeType> {
 internal fun arraySetOf(vararg suffixes: String): Set<String> {
     return ArraySet(Arrays.asList(*suffixes))
 }
-
-internal fun checkUriMimeType(context: Context, uri: Uri, mimeTypes: Set<MimeType>): Boolean {
-    for (mimeType in mimeTypes) {
-        if (mimeType.checkType(context, uri)) {
-            return true
-        }
-    }
-    return false
-}

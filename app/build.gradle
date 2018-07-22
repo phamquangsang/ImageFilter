@@ -2,7 +2,7 @@
 
 apply plugin: 'com.android.library'
 
-apply from: '../maven-push.gradle'
+apply from: rootProject.file('maven-push.gradle')
 
 apply plugin: 'kotlin-android'
 
@@ -63,4 +63,6 @@ dependencies {
     implementation "android.arch.work:work-firebase:$work_version"
     // optional - Test helpers
     androidTestImplementation "android.arch.work:work-testing:$work_version"
+
+    implementation "org.jetbrains.anko:anko-commons:0.10.5"
 }

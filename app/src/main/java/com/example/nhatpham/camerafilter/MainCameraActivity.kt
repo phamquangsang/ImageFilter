@@ -3,7 +3,6 @@ package com.example.nhatpham.camerafilter
 import android.Manifest
 import android.app.Activity
 import android.arch.lifecycle.Observer
-import android.arch.lifecycle.ViewModelProviders
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -15,7 +14,6 @@ import android.os.Bundle
 import android.util.Log
 import android.view.Window
 import android.view.WindowManager
-import android.webkit.MimeTypeMap
 import com.example.nhatpham.camerafilter.camera.CameraFragment
 import com.example.nhatpham.camerafilter.gallery.GalleryFragment
 import com.example.nhatpham.camerafilter.models.Config
@@ -27,10 +25,10 @@ import com.example.nhatpham.camerafilter.preview.VideoPreviewFragment
 import com.example.nhatpham.camerafilter.utils.*
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import org.jetbrains.anko.intentFor
 import org.wysaid.common.Common
 import org.wysaid.nativePort.CGENativeLibrary
 import java.io.*
-import java.net.URLConnection
 import kotlin.math.absoluteValue
 
 class MainCameraActivity : AppCompatActivity() {
@@ -65,15 +63,15 @@ class MainCameraActivity : AppCompatActivity() {
             }
         }, null)
 
-        mainViewModel = ViewModelProviders.of(this).get(MainViewModel::class.java)
+        mainViewModel = getViewModel(this)
         mainViewModel.openPhotoPreviewEvent.observe(this, Observer { photo ->
             if (photo != null) {
-                showPhotoPreviewFragment(photo)
+                showPhotoPreviewFragment(photo, photo.source != Source.NONE)
             }
         })
         mainViewModel.openVideoPreviewEvent.observe(this, Observer { video ->
             if (video != null) {
-                showVideoPreviewFragment(video)
+                showVideoPreviewFragment(video, video.source != Source.NONE)
             }
         })
         mainViewModel.openGalleryEvent.observe(this, Observer {
@@ -111,15 +109,11 @@ class MainCameraActivity : AppCompatActivity() {
         if (!checkToRequestPermissions()) {
             if (savedInstanceState == null) {
                 if (intent.data != null) {
-                    val mediaUri = intent.data
-                    when {
-                        checkUriMimeType(this, mediaUri, ofImage()) || ofImage().any { it.toString() == intent.type } -> {
-                            showPhotoPreviewFragment(Photo(mediaUri, NONE_CONFIG, Source.NONE), false)
-                        }
-                        checkUriMimeType(this, mediaUri, ofVideo()) || ofVideo().any { it.toString() == intent.type } -> {
-                            showVideoPreviewFragment(Video(mediaUri, NONE_CONFIG, Source.NONE), false)
-                        }
-                        else -> finish()
+                    val previewType  = intent.getSerializableExtra(PREVIEW_TYPE) as? PreviewType
+                    when (previewType) {
+                        PreviewType.Photo -> mainViewModel.openPhotoPreviewEvent.value = Photo(intent.data, NONE_CONFIG)
+                        PreviewType.Video -> mainViewModel.openVideoPreviewEvent.value = Video(intent.data, NONE_CONFIG)
+                        else -> mainViewModel.checkToOpenPreview(intent.data)
                     }
                 } else {
                     showCameraFragment()
@@ -132,7 +126,7 @@ class MainCameraActivity : AppCompatActivity() {
         val permissions = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO,
                 Manifest.permission.READ_EXTERNAL_STORAGE,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        return com.example.nhatpham.camerafilter.utils.requestPermissions(this, REQUEST_PERMISSIONS, *permissions)
+        return requestPermissions(this, REQUEST_PERMISSIONS, *permissions)
     }
 
     private fun showCameraFragment() {
@@ -178,10 +172,12 @@ class MainCameraActivity : AppCompatActivity() {
 
     companion object {
         private const val REQUEST_PERMISSIONS = 1
+        private const val PREVIEW_TYPE = "PREVIEW_TYPE"
 
         @JvmOverloads
         @JvmStatic
-        fun newIntent(context: Context, mediaUri: Uri, type: String = "") =
-                Intent(context, MainCameraActivity::class.java).setDataAndType(mediaUri, type)
+        fun newIntent(context: Context, mediaUri: Uri, previewType: PreviewType) =
+            context.intentFor<MainCameraActivity>(PREVIEW_TYPE to previewType)
+                    .setData(mediaUri)
     }
 }
