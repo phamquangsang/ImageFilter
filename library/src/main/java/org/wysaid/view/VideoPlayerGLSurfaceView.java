@@ -188,8 +188,8 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
         queueEvent(new Runnable() {
             @Override
             public void run() {
+                lastConfig = config;
                 if (mFrameRenderer != null) {
-                    lastConfig = config;
                     mFrameRenderer.setFilterWidthConfig(config);
                     if (mHandleCurrentFrame)
                         requestRender();
@@ -337,6 +337,9 @@ public class VideoPlayerGLSurfaceView extends GLSurfaceView implements GLSurface
     }
 
     public void createFrameRenderer(int videoWidth, int videoHeight) {
+        if(mVideoWidth == videoWidth && mVideoHeight == videoHeight) {
+            return;
+        }
         mVideoWidth = videoWidth;
         mVideoHeight = videoHeight;
 

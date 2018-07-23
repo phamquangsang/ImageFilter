@@ -13,7 +13,6 @@ import org.wysaid.view.VideoPlayerGLSurfaceView
 internal class VideoController(private val videoPlayer: VideoPlayer,
                                private val videoPlayerGLSurfaceView: VideoPlayerGLSurfaceView) : LifecycleObserver {
 
-    private var currentExoPlayer: SimpleExoPlayer? = null
     private val videoListener = object : VideoListener {
 
         override fun onVideoSizeChanged(width: Int, height: Int, unappliedRotationDegrees: Int, pixelWidthHeightRatio: Float) {
@@ -43,7 +42,6 @@ internal class VideoController(private val videoPlayer: VideoPlayer,
 
         override fun onPlayerReady(exoPlayer: ExoPlayer) {
             if (exoPlayer is SimpleExoPlayer && videoPlayerGLSurfaceView.surfaceTexture != null) {
-                currentExoPlayer = exoPlayer
                 exoPlayer.addVideoListener(videoListener)
                 exoPlayer.setVideoSurface(Surface(videoPlayerGLSurfaceView.surfaceTexture))
             }

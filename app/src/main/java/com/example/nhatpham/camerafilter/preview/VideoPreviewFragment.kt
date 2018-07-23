@@ -157,13 +157,8 @@ internal class VideoPreviewFragment : Fragment() {
             videoPreviewViewModel.showFiltersEvent.value = videoPreviewViewModel.showFiltersEvent.value?.not() ?: true
         }
 
-        mBinding.btnDone.setOnClickListener {
-            saveVideo()
-        }
-
-        mBinding.btnBack.setOnClickListener {
-            activity?.supportFragmentManager?.popBackStack()
-        }
+        mBinding.btnDone.setOnClickListener { saveVideo() }
+        mBinding.btnBack.setOnClickListener { exit() }
     }
 
     private fun saveVideo() {
@@ -302,6 +297,14 @@ internal class VideoPreviewFragment : Fragment() {
                     })
                     .start()
             mBinding.btnPickFilters.isSelected = false
+        }
+    }
+
+    private fun exit() {
+        activity?.run {
+            if(supportFragmentManager.backStackEntryCount == 0)
+                finish()
+            else supportFragmentManager.popBackStack()
         }
     }
 
