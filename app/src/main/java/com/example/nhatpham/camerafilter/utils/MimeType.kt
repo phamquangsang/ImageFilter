@@ -7,7 +7,7 @@ import android.text.TextUtils
 import android.webkit.MimeTypeMap
 import java.util.*
 
-internal enum class MimeType constructor(private val mMimeTypeName: String,
+enum class MimeType constructor(private val mMimeTypeName: String,
                                          private val mExtensions: Set<String>) {
 
     // ============== images ==============

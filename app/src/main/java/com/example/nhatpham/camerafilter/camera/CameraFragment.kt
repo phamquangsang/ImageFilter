@@ -162,6 +162,20 @@ internal class CameraFragment : Fragment() {
                 mBinding.cameraView.setZOrderMediaOverlay(true)
             }
         }
+
+         when (PREVIEW_TYPE) {
+            PreviewType.Photo -> {
+                mBinding.rcModes.isInvisible = true
+                cameraViewModel.currentModeLiveData.value = CameraMode.Photo
+            }
+            PreviewType.Video -> {
+                mBinding.rcModes.isInvisible = true
+                cameraViewModel.currentModeLiveData.value = CameraMode.Video
+            }
+            else -> {
+                mBinding.rcModes.isVisible = true
+            }
+        }
     }
 
     private fun takePhoto(context: Context) {

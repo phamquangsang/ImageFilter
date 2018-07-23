@@ -20,7 +20,6 @@ import com.bumptech.glide.request.target.Target
 import com.example.nhatpham.camerafilter.databinding.FragmentPhotoPreviewBinding
 import org.wysaid.view.ImageGLSurfaceView
 import android.view.animation.AccelerateDecelerateInterpolator
-import android.webkit.URLUtil
 import android.widget.Toast
 import androidx.core.view.isVisible
 import com.bumptech.glide.request.RequestOptions
@@ -107,13 +106,13 @@ internal class PhotoPreviewFragment : Fragment() {
                     val photoUri = currentPhoto.uri
 
                     if (currentPhoto.isFromGallery() && currentConfig == NONE_CONFIG) {
-                        val inputPath = when {
+                        val path = when {
                             isMediaStoreImageUri(photoUri) -> getPathFromMediaUri(context!!, photoUri)
                             isFileUri(photoUri) -> photoUri.path
                             else -> null
                         }
-                        if (inputPath != null)
-                            mainViewModel.doneEditEvent.postValue(Uri.parse(inputPath))
+                        if (path != null)
+                            mainViewModel.doneEditEvent.postValue(Uri.parse(path))
                         else
                             mainViewModel.doneEditEvent.postValue(null)
                     } else {

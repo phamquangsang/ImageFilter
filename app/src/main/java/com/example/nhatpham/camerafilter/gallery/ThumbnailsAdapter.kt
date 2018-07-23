@@ -13,19 +13,25 @@ import com.example.nhatpham.camerafilter.R
 import com.example.nhatpham.camerafilter.databinding.LayoutGalleryItemBinding
 import java.util.concurrent.TimeUnit
 
-internal class ImagesAdapter(private val images: List<GalleryFragment.Thumbnail> = emptyList(),
-                             private var onItemInteractListener: OnItemInteractListener?)
-    : RecyclerView.Adapter<ImagesAdapter.ViewHolder>() {
+internal class ThumbnailsAdapter(thumbnails: List<GalleryFragment.Thumbnail> = emptyList(),
+                                 private var onItemInteractListener: OnItemInteractListener?)
+    : RecyclerView.Adapter<ThumbnailsAdapter.ViewHolder>() {
+
+    private val thumbnails: MutableList<GalleryFragment.Thumbnail> = ArrayList()
+
+    init {
+        this.thumbnails.addAll(thumbnails)
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.layout_gallery_item, parent, false)
         return ViewHolder(view)
     }
 
-    override fun getItemCount() = images.size
+    override fun getItemCount() = thumbnails.size
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bindData(images[position])
+        holder.bindData(thumbnails[position])
     }
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -34,7 +40,7 @@ internal class ImagesAdapter(private val images: List<GalleryFragment.Thumbnail>
 
         init {
             mBinding!!.root.setOnClickListener {
-                onItemInteractListener?.onThumbnailSelected(images[adapterPosition])
+                onItemInteractListener?.onThumbnailSelected(thumbnails[adapterPosition])
             }
         }
 
@@ -53,6 +59,13 @@ internal class ImagesAdapter(private val images: List<GalleryFragment.Thumbnail>
                 mBinding.tvDuration.isVisible = false
                 mBinding.imgPlay.isVisible = false
             }
+        }
+    }
+
+    fun setThumbnails(thumbnails: List<GalleryFragment.Thumbnail>) {
+        this.thumbnails.apply {
+            clear()
+            addAll(thumbnails)
         }
     }
 

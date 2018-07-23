@@ -106,19 +106,26 @@ class MainCameraActivity : AppCompatActivity() {
         } catch (e: IOException) {
             Log.e(Common.LOG_TAG, "Can not open file filters.json")
         }
+
         if (!checkToRequestPermissions()) {
             if (savedInstanceState == null) {
-                if (intent.data != null) {
-                    val previewType  = intent.getSerializableExtra(PREVIEW_TYPE) as? PreviewType
-                    when (previewType) {
-                        PreviewType.Photo -> mainViewModel.openPhotoPreviewEvent.value = Photo(intent.data, NONE_CONFIG)
-                        PreviewType.Video -> mainViewModel.openVideoPreviewEvent.value = Video(intent.data, NONE_CONFIG)
-                        else -> mainViewModel.checkToOpenPreview(intent.data)
-                    }
-                } else {
-                    showCameraFragment()
-                }
+                checkToShowUI()
             }
+        }
+    }
+
+    private fun checkToShowUI() {
+        STORAGE_DIR_NAME = intent.getStringExtra(EXTRA_STORAGE_DIR_NAME) ?: ""
+
+        if (intent.data != null) {
+            val isVideo = intent.getBooleanExtra(EXTRA_MEDIA_VIDEO, false)
+            if (isVideo)
+                mainViewModel.openVideoPreviewEvent.value = Video(intent.data, NONE_CONFIG)
+            else
+                mainViewModel.openPhotoPreviewEvent.value = Photo(intent.data, NONE_CONFIG)
+        } else {
+            PREVIEW_TYPE = intent.getSerializableExtra(EXTRA_PREVIEW_TYPE) as? PreviewType ?: PreviewType.Both
+            showCameraFragment()
         }
     }
 
@@ -138,14 +145,14 @@ class MainCameraActivity : AppCompatActivity() {
     private fun showPhotoPreviewFragment(photo: Photo, shouldAddToBackStack: Boolean = true) {
         supportFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(photo))
-                .also { if(shouldAddToBackStack) it.addToBackStack(null) }
+                .also { if (shouldAddToBackStack) it.addToBackStack(null) }
                 .commit()
     }
 
     private fun showVideoPreviewFragment(video: Video, shouldAddToBackStack: Boolean = true) {
         supportFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, VideoPreviewFragment.newInstance(video))
-                .also { if(shouldAddToBackStack) it.addToBackStack(null) }
+                .also { if (shouldAddToBackStack) it.addToBackStack(null) }
                 .commit()
     }
 
@@ -161,7 +168,7 @@ class MainCameraActivity : AppCompatActivity() {
             REQUEST_PERMISSIONS -> {
                 val somePermissionsNotGranted = grantResults.any { it.absoluteValue != PackageManager.PERMISSION_GRANTED }
                 if (!somePermissionsNotGranted) {
-                    showCameraFragment()
+                    checkToShowUI()
                 } else {
                     finish()
                 }
@@ -172,12 +179,21 @@ class MainCameraActivity : AppCompatActivity() {
 
     companion object {
         private const val REQUEST_PERMISSIONS = 1
-        private const val PREVIEW_TYPE = "PREVIEW_TYPE"
+        private const val EXTRA_STORAGE_DIR_NAME = "storage_dir_name"
+        private const val EXTRA_PREVIEW_TYPE = "preview_type"
+        private const val EXTRA_MEDIA_VIDEO = "media_video"
 
         @JvmOverloads
         @JvmStatic
-        fun newIntent(context: Context, mediaUri: Uri, previewType: PreviewType) =
-            context.intentFor<MainCameraActivity>(PREVIEW_TYPE to previewType)
-                    .setData(mediaUri)
+        fun newIntent(context: Context, storageDirName: String = "", mediaUri: Uri, isVideo: Boolean) =
+                context.intentFor<MainCameraActivity>(EXTRA_STORAGE_DIR_NAME to storageDirName,
+                        EXTRA_MEDIA_VIDEO to isVideo)
+                        .setData(mediaUri)
+
+        @JvmOverloads
+        @JvmStatic
+        fun newIntent(context: Context, storageDirName: String = "", previewType: PreviewType) =
+                context.intentFor<MainCameraActivity>(EXTRA_STORAGE_DIR_NAME to storageDirName,
+                        EXTRA_PREVIEW_TYPE to previewType)
     }
 }

@@ -13,7 +13,6 @@ import android.database.Cursor
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.ConnectivityManager
-import android.net.NetworkInfo
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.util.DisplayMetrics
@@ -27,15 +26,9 @@ import android.support.v4.app.Fragment
 import android.support.v4.app.FragmentActivity
 import android.view.View
 import android.view.ViewTreeObserver
-import com.example.nhatpham.camerafilter.models.Config
+import com.example.nhatpham.camerafilter.STORAGE_DIR_NAME
 import java.io.File
 import kotlin.collections.ArrayList
-
-const val APP_NAME = "Mingle"
-
-internal val NONE_CONFIG = Config("None", "")
-
-internal val EFFECT_CONFIGS = ArrayList<Config>()
 
 internal fun requestPermissions(activity: Activity, requestCode: Int, vararg permissions: String): Boolean {
     val notGrantedPermissions = ArrayList<String>()
@@ -85,7 +78,11 @@ internal fun isExternalStorageReadable() = Environment.getExternalStorageState()
         setOf(Environment.MEDIA_MOUNTED, Environment.MEDIA_MOUNTED_READ_ONLY)
 
 internal fun getPath(): String {
-    val path = "${Environment.getExternalStorageDirectory().absolutePath}/$APP_NAME"
+    val path = if(STORAGE_DIR_NAME.isEmpty()) {
+        "${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).absolutePath}/Camera"
+    } else {
+        "${Environment.getExternalStorageDirectory().absolutePath}/$STORAGE_DIR_NAME"
+    }
     File(path).run {
         if (!exists())
             mkdirs()
@@ -94,7 +91,7 @@ internal fun getPath(): String {
 }
 
 internal fun getInternalPath(context: Context): String {
-    val file = context.getDir("$APP_NAME-camera", Context.MODE_PRIVATE)
+    val file = context.getDir("$STORAGE_DIR_NAME-camera", Context.MODE_PRIVATE)
     return file.apply {
         if(!exists()) {
             mkdirs()

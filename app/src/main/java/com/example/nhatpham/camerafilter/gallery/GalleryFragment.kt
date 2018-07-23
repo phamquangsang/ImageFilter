@@ -15,8 +15,9 @@ import com.example.nhatpham.camerafilter.databinding.FragmentGalleryBinding
 import com.example.nhatpham.camerafilter.models.Photo
 import com.example.nhatpham.camerafilter.models.Source
 import com.example.nhatpham.camerafilter.models.Video
-import com.example.nhatpham.camerafilter.utils.NONE_CONFIG
 import com.example.nhatpham.camerafilter.utils.getViewModel
+import org.jetbrains.anko.doAsync
+import org.jetbrains.anko.uiThread
 import kotlin.Comparator
 import kotlin.collections.ArrayList
 
@@ -37,12 +38,29 @@ internal class GalleryFragment : Fragment() {
         mBinding.rcImages.layoutManager = GridLayoutManager(context, 3, GridLayoutManager.VERTICAL, false)
         mBinding.rcImages.addItemDecoration(SpacesItemDecoration(resources.getDimensionPixelSize(R.dimen.gallery_space_item_size)))
 
-        val thumbnails = getImageThumbnails().also {
-            it.addAll(0, getVideoThumbnails())
-        }.also {
-            it.sortWith(Comparator { o1, o2 -> (o2.id - o1.id).toInt() })
+
+        doAsync {
+            val thumbnails = ArrayList<Thumbnail>().apply {
+                when (PREVIEW_TYPE) {
+                    PreviewType.Photo -> addAll(getImageThumbnails())
+                    PreviewType.Video -> addAll(getVideoThumbnails())
+                    else -> {
+                        addAll(getImageThumbnails())
+                        addAll(getVideoThumbnails())
+                    }
+                }
+                sortWith(Comparator { o1, o2 -> (o2.id - o1.id).toInt() })
+            }
+            uiThread {
+                val adapter = mBinding.rcImages.adapter
+                if(adapter is ThumbnailsAdapter) {
+                    adapter.setThumbnails(thumbnails)
+                    adapter.notifyDataSetChanged()
+                }
+            }
         }
-        mBinding.rcImages.adapter = ImagesAdapter(thumbnails, object : ImagesAdapter.OnItemInteractListener {
+
+        mBinding.rcImages.adapter = ThumbnailsAdapter(ArrayList(), object : ThumbnailsAdapter.OnItemInteractListener {
             override fun onThumbnailSelected(thumbnail: Thumbnail) {
                 if (thumbnail.isVideo) {
                     val videoUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, thumbnail.id)

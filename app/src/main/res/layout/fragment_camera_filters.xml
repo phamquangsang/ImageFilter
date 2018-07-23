@@ -10,6 +10,8 @@
             type="com.example.nhatpham.camerafilter.camera.CameraViewModel" />
 
         <import type="android.view.View" />
+        <import type="com.example.nhatpham.camerafilter.AppConfigKt"/>
+        <import type="com.example.nhatpham.camerafilter.PreviewType"/>
     </data>
 
     <android.support.constraint.ConstraintLayout
@@ -114,7 +116,7 @@
             android:paddingEnd="50dp"
             android:paddingRight="50dp"
             android:paddingBottom="4dp"
-            android:visibility="@{cameraviewmodel.isRecording ? View.INVISIBLE : View.VISIBLE}"
+            android:visibility="@{cameraviewmodel.isRecording || AppConfigKt.PREVIEW_TYPE != PreviewType.Both ? View.INVISIBLE : View.VISIBLE}"
             app:layout_constraintEnd_toStartOf="@+id/btnPickFilters"
             app:layout_constraintLeft_toRightOf="@+id/btnGallery"
             app:layout_constraintRight_toLeftOf="@+id/btnPickFilters"

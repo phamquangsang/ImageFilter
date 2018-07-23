@@ -6,7 +6,6 @@ import android.arch.lifecycle.LiveData
 import android.arch.lifecycle.Observer
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
-import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
 import android.support.v4.app.Fragment
@@ -19,23 +18,13 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import androidx.core.view.isVisible
 import com.example.nhatpham.camerafilter.databinding.FragmentVideoPreviewBinding
 import org.wysaid.common.Common
-import org.wysaid.view.VideoPlayerGLSurfaceView
 import android.os.Handler
 import android.os.SystemClock
 import android.text.format.DateUtils
-import androidx.core.graphics.applyCanvas
 import androidx.work.OneTimeWorkRequest
 import androidx.work.State
 import androidx.work.WorkManager
 import androidx.work.WorkStatus
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.DataSource
-import com.bumptech.glide.load.engine.GlideException
-import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool
-import com.bumptech.glide.load.resource.bitmap.BitmapTransformation
-import com.bumptech.glide.request.RequestListener
-import com.bumptech.glide.request.RequestOptions
-import com.bumptech.glide.request.target.Target
 import com.example.nhatpham.camerafilter.*
 import com.example.nhatpham.camerafilter.jobs.GenerateFilteredVideoWorker
 import com.example.nhatpham.camerafilter.models.Config
@@ -43,9 +32,7 @@ import com.example.nhatpham.camerafilter.models.Video
 import com.example.nhatpham.camerafilter.models.isFromCamera
 import com.example.nhatpham.camerafilter.models.isFromGallery
 import com.example.nhatpham.camerafilter.utils.*
-import org.wysaid.view.ImageGLSurfaceView
 import java.io.File
-import java.security.MessageDigest
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -64,55 +51,58 @@ internal class VideoPreviewFragment : Fragment() {
     private lateinit var mainViewModel: MainViewModel
     private lateinit var videoPreviewViewModel: VideoPreviewViewModel
     private val mainHandler = Handler()
-    private var mediaPlayer: MediaPlayer? = null
     private var scheduler = Executors.newSingleThreadScheduledExecutor()
     private var timeRecordingFuture: ScheduledFuture<*>? = null
 
     private val progressDialogFragment = ProgressDialogFragment()
     private lateinit var previewFiltersAdapter: PreviewFiltersAdapter
-    private var currentBitmap: Bitmap? = null
     private val currentConfig
         get() = videoPreviewViewModel.currentConfigLiveData.value ?: NONE_CONFIG
     private var lastIntervalUpdate = 0L
     private var isCompleted = true
     private val playListener = PlayListener()
 
+    private lateinit var videoController: VideoController
+
     private val updateTimeIntervalTask = Runnable {
-        val currentPlayer = mediaPlayer
-        if (currentPlayer != null && currentPlayer.isPlaying) {
+        if (videoController.isPlaying) {
             mBinding.tvRecordingTime.text = DateUtils.formatElapsedTime(TimeUnit.MILLISECONDS.toSeconds(
                     SystemClock.elapsedRealtime() - lastIntervalUpdate))
             mBinding.tvRecordingTime.isVisible = true
         }
     }
 
-    private val playerCallback = object : VideoPlayerGLSurfaceView.PlayerCallback {
-
-        override fun initPlayer(player: MediaPlayer?) {
-            player?.setOnBufferingUpdateListener { _, percent ->
-                if (percent == 100) {
-                    player.setOnBufferingUpdateListener(null)
+    private val playerListener = object : IPlayer.SimplePlayerCallback() {
+        override fun onPlaybackStateUpdated(playbackState: PlaybackState) {
+            mainHandler.post {
+                when (playbackState.state) {
+                    PlayerState.STATE_NONE, PlayerState.STATE_STOPPED, PlayerState.STATE_BUFFERING -> {
+                        mBinding.tvRecordingTime.isVisible = false
+                        mBinding.btnPlay.isVisible = true
+                        cancelScheduledRecordTime()
+                    }
+                    PlayerState.STATE_PLAYING -> {
+                        mBinding.btnPlay.isVisible = false
+                        scheduleRecordTime()
+                    }
+                    PlayerState.STATE_PAUSED -> {
+                        mBinding.btnPlay.isVisible = true
+                        cancelScheduledRecordTime()
+                    }
                 }
             }
         }
 
-        override fun playPrepared(player: MediaPlayer?) {
-            mediaPlayer = player
-            startPlayingVideo()
+        override fun onCompletion(uri: Uri) {
+            mainHandler.post {
+                isCompleted = true
+                cancelScheduledRecordTime()
+                mBinding.tvRecordingTime.isVisible = false
+            }
         }
 
-        override fun playComplete(player: MediaPlayer?) {
-            isCompleted = true
-            mediaPlayer = player
-            cancelScheduledRecordTime()
-            mBinding.tvRecordingTime.isVisible = false
-            mBinding.videoView.isVisible = false
-            videoPreviewViewModel.showThumbnailEvent.value = true
-        }
-
-        override fun playFailed(mp: MediaPlayer?, what: Int, extra: Int): Boolean {
-            Log.d(Common.LOG_TAG, String.format("Error occured! Stop playing, Err code: %d, %d", what, extra))
-            return true
+        override fun onError(message: String) {
+            Log.d(Common.LOG_TAG, "Error occured! Stop playing, Err : $message")
         }
     }
 
@@ -129,22 +119,13 @@ internal class VideoPreviewFragment : Fragment() {
         videoPreviewViewModel.showFiltersEvent.observe(viewLifecycleOwner, Observer { active ->
             showFilters(active ?: false)
         })
-
         videoPreviewViewModel.currentConfigLiveData.value = video?.config ?: NONE_CONFIG
         videoPreviewViewModel.currentConfigLiveData.observe(viewLifecycleOwner, Observer { newConfig ->
             if (newConfig != null) {
-                val currentPlayer = mediaPlayer
-                if (currentPlayer == null || currentPlayer.isStopped()) {
-                    showThumbnail(true)
-                }
                 mBinding.videoView.setFilterWithConfig(newConfig.value)
                 mBinding.tvFilterName.text = newConfig.name
                 previewFiltersAdapter.setNewConfig(newConfig)
             }
-        })
-
-        videoPreviewViewModel.showThumbnailEvent.observe(viewLifecycleOwner, Observer {
-            showThumbnail(it ?: true)
         })
 
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
@@ -157,20 +138,14 @@ internal class VideoPreviewFragment : Fragment() {
         val pos = previewFiltersAdapter.findConfigPos(video?.config ?: NONE_CONFIG)
         mBinding.rcImgPreview.scrollToPosition(pos ?: 0)
 
+        videoController = VideoController(VideoPlayer(context!!), mBinding.videoView)
+        videoController.addPlayerListener(playerListener)
+        video?.uri?.let { videoController.play(it) }
+        lifecycle.addObserver(videoController)
+
         mBinding.videoView.apply {
             setZOrderOnTop(false)
-            setPlayerCallback(playerCallback)
-            setVideoUri(video?.uri)
-            setOnClickListener(playListener)
-            isVisible = false
-        }
-
-        mBinding.imgVideoThumb.apply {
-            displayMode = ImageGLSurfaceView.DisplayMode.DISPLAY_ASPECT_FILL
-            setSurfaceCreatedCallback {
-                setImageBitmap(currentBitmap)
-                setFilterWithConfig(currentConfig.value)
-            }
+            setFitFullView(true)
             setOnClickListener(playListener)
         }
 
@@ -183,61 +158,7 @@ internal class VideoPreviewFragment : Fragment() {
         }
 
         mBinding.btnDone.setOnClickListener {
-            val currentVideo = video
-            if (currentVideo != null && (isMediaStoreVideoUri(currentVideo.uri) ||
-                            (isFileUri(currentVideo.uri) && File(currentVideo.uri.path).exists()))) {
-                mediaPlayer?.run {
-                    if (isPlaying)
-                        stop()
-                }
-                if (currentVideo.isFromGallery() && currentConfig == NONE_CONFIG) {
-                    mainViewModel.doneEditEvent.value = currentVideo.uri
-                } else {
-                    val context = context ?: kotlin.run {
-                        mainViewModel.doneEditEvent.value = null
-                        return@setOnClickListener
-                    }
-
-                    val inputPath = if (currentVideo.isFromGallery())
-                        getPathFromMediaUri(context, currentVideo.uri)
-                    else
-                        currentVideo.uri.toString()
-
-                    if (inputPath == null) {
-                        mainViewModel.doneEditEvent.value = null
-                        return@setOnClickListener
-                    }
-
-                    scheduleGenerateFilteredVideoNow(inputPath, currentConfig.value, videoPathToSave)?.observe(viewLifecycleOwner,
-                            Observer { workStatus ->
-                                if (workStatus != null) {
-                                    if (workStatus.state.isFinished) {
-                                        progressDialogFragment.dismiss()
-
-                                        if (workStatus.state == State.SUCCEEDED) {
-                                            val outputUri = workStatus.outputData.getString(GenerateFilteredVideoWorker.KEY_RESULT, "")
-                                            if (outputUri != null && !outputUri.isEmpty()) {
-                                                mainViewModel.doneEditEvent.value = Uri.parse(outputUri)
-                                            } else {
-                                                mainViewModel.doneEditEvent.value = null
-                                            }
-                                        } else {
-                                            mainViewModel.doneEditEvent.value = null
-                                        }
-                                    } else {
-                                        when (workStatus.state) {
-                                            State.ENQUEUED -> {
-                                                progressDialogFragment.show(fragmentManager, ProgressDialogFragment::class.java.simpleName)
-                                            }
-                                            else -> {
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                    )
-                }
-            } else mainViewModel.doneEditEvent.value = null
+            saveVideo()
         }
 
         mBinding.btnBack.setOnClickListener {
@@ -245,69 +166,66 @@ internal class VideoPreviewFragment : Fragment() {
         }
     }
 
-    private fun MediaPlayer.isPaused() = !isPlaying && !isCompleted
+    private fun saveVideo() {
+        val currentVideo = video
+        if (currentVideo != null && (isMediaStoreVideoUri(currentVideo.uri) ||
+                        (isFileUri(currentVideo.uri) && File(currentVideo.uri.path).exists()))) {
+            videoController.stop()
 
-    private fun MediaPlayer.isStopped() = !isPlaying && isCompleted
-
-    private fun startPlayingVideo() {
-        isCompleted = false
-
-        mediaPlayer?.run {
-            videoPreviewViewModel.showThumbnailEvent.value = false
-            mBinding.videoView.setFilterWithConfig(currentConfig.value)
-            start()
-
-            lastIntervalUpdate = SystemClock.elapsedRealtime() + PROGRESS_UPDATE_INITIAL_INTERVAL
-            scheduleRecordTime()
-        }
-    }
-
-    private fun showThumbnail(visible: Boolean, config: Config = currentConfig) {
-        mBinding.btnPlay.isVisible = visible
-        if (visible) {
-            mBinding.imgVideoThumb.isVisible = true
-
-            if (currentBitmap == null) {
-                mBinding.imgVideoThumb.afterMeasured {
-                    Glide.with(this)
-                            .asBitmap()
-                            .load(video?.uri)
-                            .apply(RequestOptions.skipMemoryCacheOf(true))
-                            .apply(RequestOptions.overrideOf(width, height))
-                            .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
-                                override fun updateDiskCacheKey(messageDigest: MessageDigest) {
-                                    val videoUri = video?.uri
-                                    if (videoUri != null) {
-                                        messageDigest.update("$videoUri-${config.name}".toByteArray())
-                                    }
-                                }
-
-                                override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int): Bitmap {
-                                    return Bitmap.createBitmap(toTransform.width, toTransform.height, Bitmap.Config.ARGB_8888).applyCanvas {
-                                        drawBitmap(toTransform, 0F, 0F, null)
-                                    }
-                                }
-
-                            })).listener(object : RequestListener<Bitmap> {
-                                override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Bitmap>?, isFirstResource: Boolean): Boolean {
-                                    return false
-                                }
-
-                                override fun onResourceReady(resource: Bitmap?, model: Any?, target: Target<Bitmap>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
-                                    currentBitmap = resource
-                                    setImageBitmap(currentBitmap)
-                                    setFilterWithConfig(config.value)
-                                    return false
-                                }
-                            })
-                            .submit()
+            if (currentVideo.isFromGallery() && currentConfig == NONE_CONFIG) {
+                when {
+                    isMediaStoreImageUri(currentVideo.uri) -> {
+                        val path = getPathFromMediaUri(context!!, currentVideo.uri)
+                        if(!path.isNullOrEmpty()) {
+                            mainViewModel.doneEditEvent.value = Uri.fromFile(File(path))
+                        } else {
+                            mainViewModel.doneEditEvent.value = null
+                        }
+                    }
+                    isFileUri(currentVideo.uri) && File(currentVideo.uri.path).exists() -> {
+                        mainViewModel.doneEditEvent.value = currentVideo.uri
+                    }
+                    else -> mainViewModel.doneEditEvent.value = null
                 }
             } else {
-                mBinding.imgVideoThumb.setFilterWithConfig(config.value)
+                val inputPath = if (currentVideo.isFromGallery())
+                    getPathFromMediaUri(context!!, currentVideo.uri)
+                else
+                    currentVideo.uri.toString()
+
+                if (inputPath == null) {
+                    mainViewModel.doneEditEvent.value = null
+                    return
+                }
+
+                scheduleGenerateFilteredVideoNow(inputPath, currentConfig.value, videoPathToSave)?.observe(viewLifecycleOwner,
+                        Observer { workStatus ->
+                            if (workStatus != null) {
+                                if (workStatus.state.isFinished) {
+                                    progressDialogFragment.dismiss()
+
+                                    if (workStatus.state == State.SUCCEEDED) {
+                                        val outputUri = workStatus.outputData.getString(GenerateFilteredVideoWorker.KEY_RESULT, "")
+                                        if (outputUri != null && !outputUri.isEmpty()) {
+                                            mainViewModel.doneEditEvent.value = Uri.parse(outputUri)
+                                        } else {
+                                            mainViewModel.doneEditEvent.value = null
+                                        }
+                                    } else {
+                                        mainViewModel.doneEditEvent.value = null
+                                    }
+                                } else {
+                                    when (workStatus.state) {
+                                        State.ENQUEUED -> {
+                                            progressDialogFragment.show(fragmentManager, ProgressDialogFragment::class.java.simpleName)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                )
             }
-        } else {
-            mBinding.imgVideoThumb.isVisible = false
-        }
+        } else mainViewModel.doneEditEvent.value = null
     }
 
     private fun scheduleGenerateFilteredVideoNow(inputPath: String, config: String, outputPath: String): LiveData<WorkStatus>? {
@@ -323,6 +241,7 @@ internal class VideoPreviewFragment : Fragment() {
     }
 
     private fun scheduleRecordTime() {
+        cancelScheduledRecordTime()
         timeRecordingFuture = scheduler.scheduleAtFixedRate({
             mainHandler.post(updateTimeIntervalTask)
         }, PROGRESS_UPDATE_INITIAL_INTERVAL, PROGRESS_UPDATE_INTERNAL, TimeUnit.MILLISECONDS)
@@ -388,30 +307,7 @@ internal class VideoPreviewFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        mBinding.imgVideoThumb.onResume()
-        mBinding.videoView.setPlayerCallback(playerCallback)
-        mBinding.videoView.onResume()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        mediaPlayer = null
-        mBinding.imgVideoThumb.apply {
-            release()
-            onPause()
-        }
-        mBinding.videoView.apply {
-            isVisible = false
-            release()
-            onPause()
-        }
-        cancelScheduledRecordTime()
-    }
-
-    override fun onStop() {
-        super.onStop()
-        mBinding.tvRecordingTime.isVisible = false
-        videoPreviewViewModel.showThumbnailEvent.postValue(true)
+        videoController.addPlayerListener(playerListener)
     }
 
     override fun onDestroy() {
@@ -436,29 +332,30 @@ internal class VideoPreviewFragment : Fragment() {
         }
     }
 
-    inner class PlayListener : View.OnClickListener {
+    private inner class PlayListener : View.OnClickListener {
 
         override fun onClick(view: View?) {
             mBinding.videoView.isVisible = true
 
-            val currentPlayer = mediaPlayer
-            if (currentPlayer != null) {
-                when {
-                    currentPlayer.isStopped() -> startPlayingVideo()
-                    currentPlayer.isPaused() -> {
-                        lastIntervalUpdate = SystemClock.elapsedRealtime() - currentPlayer.currentPosition + PROGRESS_UPDATE_INITIAL_INTERVAL
-                        mBinding.btnPlay.isVisible = false
-                        scheduleRecordTime()
-                        currentPlayer.start()
-                    }
-                    else -> {
-                        mBinding.btnPlay.isVisible = true
-                        cancelScheduledRecordTime()
-                        currentPlayer.pause()
+            val uri = video?.uri
+            if (uri != null) {
+                if (isCompleted) {
+                    isCompleted = false
+                    mBinding.videoView.setFilterWithConfig(currentConfig.value)
+                    lastIntervalUpdate = SystemClock.elapsedRealtime() + PROGRESS_UPDATE_INITIAL_INTERVAL
+
+                    videoController.play(uri)
+                } else {
+                    when (videoController.currentState.state) {
+                        PlayerState.STATE_PAUSED -> {
+                            lastIntervalUpdate = SystemClock.elapsedRealtime() - videoController.currentPosition + PROGRESS_UPDATE_INITIAL_INTERVAL
+                            videoController.play(uri)
+                        }
+                        PlayerState.STATE_PLAYING -> {
+                            videoController.pause()
+                        }
                     }
                 }
-            } else {
-                mBinding.videoView.setVideoUri(video?.uri)
             }
         }
     }
