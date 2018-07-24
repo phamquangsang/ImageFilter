@@ -42,6 +42,7 @@ internal class VideoController(private val videoPlayer: VideoPlayer,
 
         override fun onPlayerReady(exoPlayer: ExoPlayer) {
             if (exoPlayer is SimpleExoPlayer && videoPlayerGLSurfaceView.surfaceTexture != null) {
+                exoPlayer.removeVideoListener(videoListener)
                 exoPlayer.addVideoListener(videoListener)
                 exoPlayer.setVideoSurface(Surface(videoPlayerGLSurfaceView.surfaceTexture))
             }

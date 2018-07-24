@@ -26,13 +26,12 @@ internal class PreviewFiltersAdapter(context: Context,
                                      private val onItemInteractListener: PreviewFiltersAdapter.OnItemInteractListener?)
     : RecyclerView.Adapter<PreviewFiltersAdapter.ViewHolder>() {
 
-    val previewSize = convertDpToPixel(context, 40F)
-    val selectedColor = Color.parseColor("#FF7A79")
-    val defaultScale = 1F
-    val selectedScale = 1.05F
+    private val previewSize = convertDpToPixel(context, 40F)
+    private val selectedColor = Color.parseColor("#FF7A79")
+    private val defaultScale = 1F
+    private val selectedScale = 1.05F
 
     var imageUri: String? = null
-
     private var lastSelectedPosition = 0
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PreviewFiltersAdapter.ViewHolder {

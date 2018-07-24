@@ -9,7 +9,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.SystemClock
-import android.support.v4.app.Fragment
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.PagerSnapHelper
 import android.support.v7.widget.RecyclerView
@@ -25,7 +24,6 @@ import com.example.nhatpham.camerafilter.*
 import com.example.nhatpham.camerafilter.databinding.FragmentCameraFiltersBinding
 import com.example.nhatpham.camerafilter.models.*
 import com.example.nhatpham.camerafilter.utils.*
-import org.wysaid.camera.CameraInstance
 import org.wysaid.myUtils.FileUtil
 import org.wysaid.myUtils.ImageUtil
 import java.io.File
@@ -33,7 +31,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
-internal class CameraFragment : Fragment() {
+internal class CameraFragment : ViewLifecycleFragment(), View.OnClickListener {
 
     private lateinit var mBinding: FragmentCameraFiltersBinding
     private lateinit var mainViewModel: MainViewModel
@@ -47,53 +45,18 @@ internal class CameraFragment : Fragment() {
     private var timeRecordingFuture: ScheduledFuture<*>? = null
     private val currentConfig
         get() = cameraViewModel.currentConfigLiveData.value ?: NONE_CONFIG
+    private val animShortDuration by lazy {
+        resources.getInteger(android.R.integer.config_shortAnimTime).toLong()
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_camera_filters, container, false)
-        initialize()
+        initUI()
         return mBinding.root
     }
 
-    private fun initialize() {
-        mainViewModel = getViewModel(activity!!)
-        cameraViewModel = getViewModel(this)
-        mBinding.cameraviewmodel = cameraViewModel
-
-        cameraViewModel.showFiltersEvent.observe(viewLifecycleOwner, Observer { active ->
-            showFilters(active ?: false)
-        })
-
-        cameraViewModel.currentModeLiveData.observe(viewLifecycleOwner, Observer {
-            updateModeView(it ?: CameraMode.Photo)
-        })
-
-        if(cameraViewModel.cameraBackForwardLiveData.value == null) {
-            cameraViewModel.cameraBackForwardLiveData.value = mBinding.cameraView.isCameraBackForward
-        }
-        cameraViewModel.cameraBackForwardLiveData.observe(viewLifecycleOwner, Observer {
-            if(mBinding.cameraView.isCameraBackForward != it) {
-                mBinding.cameraView.switchCamera()
-            }
-        })
-
-        cameraViewModel.currentConfigLiveData.observe(viewLifecycleOwner, Observer { newConfig ->
-            if (newConfig != null) {
-                mBinding.cameraView.setFilterWithConfig(newConfig.value)
-                mBinding.tvFilterName.text = newConfig.name
-                previewFiltersAdapter.setNewConfig(newConfig)
-            }
-        })
-
-        cameraViewModel.recordingStateLiveData.observe(viewLifecycleOwner, Observer {
-            val active = it == true
-            mBinding.btnRecord.setImageResource(if (active) R.drawable.stop_recording else R.drawable.start_record)
-            cameraViewModel.isRecording.set(active)
-            if (active)
-                showFilters(false)
-            else cameraViewModel.showFiltersEvent.value = cameraViewModel.showFiltersEvent.value
-        })
-
-        mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
+    private fun initUI() {
+        mBinding.rcImgPreview.layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
         previewFiltersAdapter = PreviewFiltersAdapter(context!!, EFFECT_CONFIGS, object : PreviewFiltersAdapter.OnItemInteractListener {
             override fun onConfigSelected(selectedConfig: Config) {
                 cameraViewModel.currentConfigLiveData.value = selectedConfig
@@ -129,31 +92,18 @@ internal class CameraFragment : Fragment() {
         })
 
         mBinding.btnRecord.setOnClickListener(RecordListener())
+        mBinding.btnTakePhoto.setOnClickListener(this)
+        mBinding.btnPickFilters.setOnClickListener(this)
+        mBinding.btnGallery.setOnClickListener(this)
+        mBinding.btnBack.setOnClickListener(this)
+        mBinding.btnSwitch.setOnClickListener(this)
 
-        mBinding.btnTakePhoto.setOnClickListener {
-            context?.let { takePhoto(it) }
-        }
-
-        mBinding.btnPickFilters.setOnClickListener {
-            cameraViewModel.showFiltersEvent.value = cameraViewModel.showFiltersEvent.value?.not() ?: true
-        }
-
-        mBinding.btnGallery.setOnClickListener {
-            mainViewModel.openGalleryEvent.call()
-        }
-
-        mBinding.btnBack.setOnClickListener {
-            activity?.finish()
-        }
-
-        mBinding.btnSwitch.setOnClickListener {
-            mBinding.cameraView.switchCamera()
-            cameraViewModel.cameraBackForwardLiveData.value = mBinding.cameraView.isCameraBackForward
-        }
-
-
+        lifecycle.addObserver(mBinding.cameraView)
         mBinding.cameraView.setOnCreateCallback {
             mBinding.cameraView.setFilterWithConfig(currentConfig.value)
+        }
+        mBinding.cameraView.setReleaseOKCallback {
+            cameraViewModel.recordingStateLiveData.postValue(false)
         }
         mBinding.root.afterMeasured {
             mBinding.cameraView.setCameraReadyCallback {
@@ -162,8 +112,49 @@ internal class CameraFragment : Fragment() {
                 mBinding.cameraView.setZOrderMediaOverlay(true)
             }
         }
+    }
 
-         when (PREVIEW_TYPE) {
+    override fun onActivityCreated(savedInstanceState: Bundle?) {
+        super.onActivityCreated(savedInstanceState)
+        mainViewModel = getViewModel(activity!!)
+        cameraViewModel = getViewModel(this)
+        mBinding.cameraviewmodel = cameraViewModel
+
+        cameraViewModel.showFiltersEvent.observe(viewLifecycleOwner!!, Observer { active ->
+            showFilters(active ?: false)
+        })
+
+        cameraViewModel.currentModeLiveData.observe(viewLifecycleOwner!!, Observer {
+            updateModeView(it ?: CameraMode.Photo)
+        })
+
+        if (cameraViewModel.cameraBackForwardLiveData.value == null) {
+            cameraViewModel.cameraBackForwardLiveData.value = mBinding.cameraView.isCameraBackForward
+        }
+        cameraViewModel.cameraBackForwardLiveData.observe(viewLifecycleOwner!!, Observer {
+            if (mBinding.cameraView.isCameraBackForward != it) {
+                mBinding.cameraView.switchCamera()
+            }
+        })
+
+        cameraViewModel.currentConfigLiveData.observe(viewLifecycleOwner!!, Observer { newConfig ->
+            if (newConfig != null) {
+                mBinding.cameraView.setFilterWithConfig(newConfig.value)
+                mBinding.tvFilterName.text = newConfig.name
+                previewFiltersAdapter.setNewConfig(newConfig)
+            }
+        })
+
+        cameraViewModel.recordingStateLiveData.observe(viewLifecycleOwner!!, Observer {
+            val active = it == true
+            mBinding.btnRecord.setImageResource(if (active) R.drawable.stop_recording else R.drawable.start_record)
+            cameraViewModel.isRecording.set(active)
+            if (active)
+                showFilters(false)
+            else cameraViewModel.showFiltersEvent.value = cameraViewModel.showFiltersEvent.value
+        })
+
+        when (PREVIEW_TYPE) {
             PreviewType.Photo -> {
                 mBinding.rcModes.isInvisible = true
                 cameraViewModel.currentModeLiveData.value = CameraMode.Photo
@@ -175,89 +166,6 @@ internal class CameraFragment : Fragment() {
             else -> {
                 mBinding.rcModes.isVisible = true
             }
-        }
-    }
-
-    private fun takePhoto(context: Context) {
-        mBinding.cameraView.takePicture({ bitmap ->
-            if (bitmap != null) {
-                val filePath = ImageUtil.saveBitmap(bitmap, "${getInternalPath(context)}/${generateImageFileName()}")
-                bitmap.recycle()
-
-                if (!filePath.isNullOrEmpty()) {
-                    val fileUri = Uri.fromFile(File(filePath)).also {
-                        reScanFile(context, it)
-                    }
-                    mainViewModel.openPhotoPreviewEvent.value = Photo(fileUri, currentConfig, Source.CAMERA)
-                }
-            }
-        }, null, NONE_CONFIG.value, 1.0f, true)
-    }
-
-    private fun updateModeView(newMode: CameraMode) {
-        when (newMode) {
-            CameraMode.Photo -> {
-                mBinding.btnTakePhoto.isVisible = true
-                mBinding.btnRecord.isVisible = false
-            }
-            CameraMode.Video -> {
-                mBinding.btnTakePhoto.isInvisible = true
-                mBinding.btnRecord.isVisible = true
-            }
-        }
-    }
-
-    private fun showFilters(visible: Boolean) {
-        val duration = resources.getInteger(android.R.integer.config_shortAnimTime).toLong()
-
-        if (visible && !mBinding.rcImgPreview.isVisible) {
-            mBinding.rcImgPreview.post {
-                mBinding.rcImgPreview.alpha = 0.6F
-                mBinding.rcImgPreview.isVisible = true
-            }
-            mBinding.rcImgPreview.post {
-                mBinding.rcImgPreview.animate()
-                        .alpha(1F)
-                        .setDuration(duration)
-                        .setInterpolator(AccelerateDecelerateInterpolator())
-                        .start()
-            }
-            mBinding.tvFilterName.post {
-                mBinding.tvFilterName.alpha = 0.6F
-                mBinding.tvFilterName.text = currentConfig.name
-                mBinding.tvFilterName.isVisible = true
-            }
-            mBinding.tvFilterName.post {
-                mBinding.tvFilterName.animate()
-                        .alpha(1F)
-                        .setDuration(duration)
-                        .setInterpolator(AccelerateDecelerateInterpolator())
-                        .start()
-            }
-            mBinding.btnPickFilters.isSelected = true
-        } else if (!visible && mBinding.rcImgPreview.isVisible) {
-            mBinding.rcImgPreview.animate()
-                    .alpha(0F)
-                    .setDuration(duration)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .setListener(object : AnimatorListenerAdapter() {
-                        override fun onAnimationEnd(animation: Animator?) {
-                            mBinding.rcImgPreview.animate().setListener(null)
-                            mBinding.rcImgPreview.isVisible = false
-                        }
-                    }).start()
-            mBinding.tvFilterName.animate()
-                    .alpha(0F)
-                    .setDuration(duration)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .setListener(object : AnimatorListenerAdapter() {
-                        override fun onAnimationEnd(animation: Animator?) {
-                            mBinding.tvFilterName.animate().setListener(null)
-                            mBinding.tvFilterName.isVisible = false
-                        }
-                    })
-                    .start()
-            mBinding.btnPickFilters.isSelected = false
         }
     }
 
@@ -276,18 +184,69 @@ internal class CameraFragment : Fragment() {
         timeRecordingFuture?.cancel(false)
     }
 
-    override fun onResume() {
-        super.onResume()
-        mBinding.cameraView.onResume()
+    private fun updateModeView(newMode: CameraMode) {
+        when (newMode) {
+            CameraMode.Photo -> {
+                mBinding.btnTakePhoto.isVisible = true
+                mBinding.btnRecord.isVisible = false
+            }
+            CameraMode.Video -> {
+                mBinding.btnTakePhoto.isInvisible = true
+                mBinding.btnRecord.isVisible = true
+            }
+        }
     }
 
-    override fun onPause() {
-        super.onPause()
-        CameraInstance.getInstance().stopCamera()
-        mBinding.cameraView.release {
-            cameraViewModel.recordingStateLiveData.postValue(false)
+    private fun showFilters(visible: Boolean) {
+        if (visible && !mBinding.rcImgPreview.isVisible) {
+            mBinding.rcImgPreview.post {
+                mBinding.rcImgPreview.alpha = 0.6F
+                mBinding.rcImgPreview.isVisible = true
+            }
+            mBinding.rcImgPreview.post {
+                mBinding.rcImgPreview.animate()
+                        .alpha(1F)
+                        .setDuration(animShortDuration)
+                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .start()
+            }
+            mBinding.tvFilterName.post {
+                mBinding.tvFilterName.alpha = 0.6F
+                mBinding.tvFilterName.text = currentConfig.name
+                mBinding.tvFilterName.isVisible = true
+            }
+            mBinding.tvFilterName.post {
+                mBinding.tvFilterName.animate()
+                        .alpha(1F)
+                        .setDuration(animShortDuration)
+                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .start()
+            }
+            mBinding.btnPickFilters.isSelected = true
+        } else if (!visible && mBinding.rcImgPreview.isVisible) {
+            mBinding.rcImgPreview.animate()
+                    .alpha(0F)
+                    .setDuration(animShortDuration)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator?) {
+                            mBinding.rcImgPreview.animate().setListener(null)
+                            mBinding.rcImgPreview.isVisible = false
+                        }
+                    }).start()
+            mBinding.tvFilterName.animate()
+                    .alpha(0F)
+                    .setDuration(animShortDuration)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator?) {
+                            mBinding.tvFilterName.animate().setListener(null)
+                            mBinding.tvFilterName.isVisible = false
+                        }
+                    })
+                    .start()
+            mBinding.btnPickFilters.isSelected = false
         }
-        mBinding.cameraView.onPause()
     }
 
     override fun onStop() {
@@ -296,8 +255,51 @@ internal class CameraFragment : Fragment() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         scheduler.shutdown()
+        super.onDestroy()
+    }
+
+    override fun onClick(v: View?) {
+        when (v) {
+            mBinding.btnPickFilters -> toggleFilters()
+            mBinding.btnTakePhoto -> context?.let { takePhoto(it) }
+            mBinding.btnSwitch -> switchCamera()
+            mBinding.btnGallery -> openGallery()
+            mBinding.btnBack -> exit()
+        }
+    }
+
+    private fun toggleFilters() {
+        cameraViewModel.showFiltersEvent.value = cameraViewModel.showFiltersEvent.value?.not() ?: true
+    }
+
+    private fun takePhoto(context: Context) {
+        mBinding.cameraView.takePicture({ bitmap ->
+            if (bitmap != null) {
+                val filePath = ImageUtil.saveBitmap(bitmap, "${getInternalPath(context)}/${generateImageFileName()}")
+                bitmap.recycle()
+
+                if (!filePath.isNullOrEmpty()) {
+                    val fileUri = Uri.fromFile(File(filePath)).also {
+                        reScanFile(context, it)
+                    }
+                    mainViewModel.openPhotoPreviewEvent.value = Photo(fileUri, currentConfig, Source.CAMERA)
+                }
+            }
+        }, null, NONE_CONFIG.value, 1.0f, true)
+    }
+
+    private fun switchCamera() {
+        mBinding.cameraView.switchCamera()
+        cameraViewModel.cameraBackForwardLiveData.value = mBinding.cameraView.isCameraBackForward
+    }
+
+    private fun openGallery() {
+        mainViewModel.openGalleryEvent.call()
+    }
+
+    private fun exit() {
+        activity?.finish()
     }
 
     private fun onStartRecording() {

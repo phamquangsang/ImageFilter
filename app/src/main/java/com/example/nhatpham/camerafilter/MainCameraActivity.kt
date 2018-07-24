@@ -20,8 +20,8 @@ import com.example.nhatpham.camerafilter.models.Config
 import com.example.nhatpham.camerafilter.models.Photo
 import com.example.nhatpham.camerafilter.models.Source
 import com.example.nhatpham.camerafilter.models.Video
-import com.example.nhatpham.camerafilter.preview.PhotoPreviewFragment
-import com.example.nhatpham.camerafilter.preview.VideoPreviewFragment
+import com.example.nhatpham.camerafilter.preview.PhotoReviewFragment
+import com.example.nhatpham.camerafilter.preview.VideoReviewFragment
 import com.example.nhatpham.camerafilter.utils.*
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -66,12 +66,12 @@ class MainCameraActivity : AppCompatActivity() {
         mainViewModel = getViewModel(this)
         mainViewModel.openPhotoPreviewEvent.observe(this, Observer { photo ->
             if (photo != null) {
-                showPhotoPreviewFragment(photo, photo.source != Source.NONE)
+                showPhotoReviewFragment(photo, photo.source != Source.NONE)
             }
         })
         mainViewModel.openVideoPreviewEvent.observe(this, Observer { video ->
             if (video != null) {
-                showVideoPreviewFragment(video, video.source != Source.NONE)
+                showVideoReviewFragment(video, video.source != Source.NONE)
             }
         })
         mainViewModel.openGalleryEvent.observe(this, Observer {
@@ -142,16 +142,16 @@ class MainCameraActivity : AppCompatActivity() {
                 .commitAllowingStateLoss()
     }
 
-    private fun showPhotoPreviewFragment(photo: Photo, shouldAddToBackStack: Boolean = true) {
+    private fun showPhotoReviewFragment(photo: Photo, shouldAddToBackStack: Boolean = true) {
         supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, PhotoPreviewFragment.newInstance(photo))
+                .replace(R.id.fragment_container, PhotoReviewFragment.newInstance(photo))
                 .also { if (shouldAddToBackStack) it.addToBackStack(null) }
                 .commit()
     }
 
-    private fun showVideoPreviewFragment(video: Video, shouldAddToBackStack: Boolean = true) {
+    private fun showVideoReviewFragment(video: Video, shouldAddToBackStack: Boolean = true) {
         supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, VideoPreviewFragment.newInstance(video))
+                .replace(R.id.fragment_container, VideoReviewFragment.newInstance(video))
                 .also { if (shouldAddToBackStack) it.addToBackStack(null) }
                 .commit()
     }

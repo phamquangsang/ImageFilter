@@ -1,5 +1,8 @@
 package org.wysaid.view;
 
+import android.arch.lifecycle.Lifecycle;
+import android.arch.lifecycle.LifecycleObserver;
+import android.arch.lifecycle.OnLifecycleEvent;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -21,7 +24,7 @@ import javax.microedition.khronos.opengles.GL10;
  * Created by wangyang on 15/7/17.
  */
 
-public class CameraGLSurfaceView extends GLSurfaceView implements GLSurfaceView.Renderer {
+public class CameraGLSurfaceView extends GLSurfaceView implements GLSurfaceView.Renderer, LifecycleObserver {
 
     public CameraGLSurfaceView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -38,12 +41,111 @@ public class CameraGLSurfaceView extends GLSurfaceView implements GLSurfaceView.
     public static final String LOG_TAG = Common.LOG_TAG;
 
     public int mMaxTextureSize = 0;
-
     protected int mViewWidth;
     protected int mViewHeight;
-
     protected int mRecordWidth = 480;
     protected int mRecordHeight = 640;
+    protected boolean mFitFullView = false;
+    protected int mMaxPreviewWidth = 1280;
+    protected int mMaxPreviewHeight = 1280;
+    //是否使用后置摄像头
+    protected boolean mIsCameraBackForward = true;
+    protected Viewport mDrawViewport = new Viewport();
+
+    private ReleaseOKCallback mReleaseOKCallback;
+    protected OnCreateCallback mOnCreateCallback;
+
+    public static class Viewport {
+         public int x, y, width, height;
+    }
+
+    @Override
+    public void onSurfaceCreated(GL10 gl, EGLConfig config) {
+        Log.i(LOG_TAG, "onSurfaceCreated...");
+
+        GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+        GLES20.glDisable(GLES20.GL_STENCIL_TEST);
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+
+        int texSize[] = new int[1];
+
+        GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, texSize, 0);
+        mMaxTextureSize = texSize[0];
+
+        if (mOnCreateCallback != null) {
+            mOnCreateCallback.createOver();
+        }
+    }
+
+    @Override
+    public void onSurfaceChanged(GL10 gl, int width, int height) {
+        Log.i(LOG_TAG, String.format("onSurfaceChanged: %d x %d", width, height));
+
+        GLES20.glClearColor(0, 0, 0, 0);
+
+        mViewWidth = width;
+        mViewHeight = height;
+
+        calcViewport();
+    }
+
+    @Override
+    public void onDrawFrame(GL10 gl) {
+        //Nothing . See `CameraGLSurfaceViewWithTexture` or `CameraGLSurfaceViewWithBuffer`
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        super.surfaceDestroyed(holder);
+        cameraInstance().stopCamera();
+    }
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)
+    @Override
+    public void onResume() {
+        super.onResume();
+        Log.i(LOG_TAG, "glsurfaceview onResume...");
+    }
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+    @Override
+    public void onPause() {
+        Log.i(LOG_TAG, "glsurfaceview onPause in...");
+        cameraInstance().stopCamera();
+        super.onPause();
+        Log.i(LOG_TAG, "glsurfaceview onPause out...");
+    }
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+    public final void release() {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                onRelease();
+
+                Log.i(LOG_TAG, "GLSurfaceview release...");
+                if (mReleaseOKCallback != null)
+                    mReleaseOKCallback.releaseOK();
+            }
+        });
+    }
+
+    //定制一些初始化操作
+    public void setOnCreateCallback(final OnCreateCallback callback) {
+        mOnCreateCallback = callback;
+    }
+
+    public void setReleaseOKCallback(ReleaseOKCallback releaseOKCallback) {
+        mReleaseOKCallback = releaseOKCallback;
+    }
+
+    protected void onRelease() {
+
+    }
+
+    public CameraInstance cameraInstance() {
+        return CameraInstance.getInstance();
+    }
 
     //isBigger 为true 表示当宽高不满足时，取最近的较大值.
     // 若为 false 则取较小的
@@ -91,15 +193,6 @@ public class CameraGLSurfaceView extends GLSurfaceView implements GLSurfaceView.
         return true;
     }
 
-    protected int mMaxPreviewWidth = 1280;
-    protected int mMaxPreviewHeight = 1280;
-
-    public static class Viewport {
-         public int x, y, width, height;
-    }
-
-    protected Viewport mDrawViewport = new Viewport();
-
     public Viewport getDrawViewport() {
         return mDrawViewport;
     }
@@ -110,22 +203,13 @@ public class CameraGLSurfaceView extends GLSurfaceView implements GLSurfaceView.
         mMaxPreviewHeight = h;
     }
 
-    protected boolean mFitFullView = false;
-
     public void setFitFullView(boolean fit) {
         mFitFullView = fit;
         calcViewport();
     }
 
-    //是否使用后置摄像头
-    protected boolean mIsCameraBackForward = true;
-
     public boolean isCameraBackForward() {
         return mIsCameraBackForward;
-    }
-
-    public CameraInstance cameraInstance() {
-        return CameraInstance.getInstance();
     }
 
     //should be called before 'onSurfaceCreated'.
@@ -171,7 +255,6 @@ public class CameraGLSurfaceView extends GLSurfaceView implements GLSurfaceView.
         queueEvent(new Runnable() {
             @Override
             public void run() {
-
                 cameraInstance().stopCamera();
                 onSwitchCamera();
                 int facing = mIsCameraBackForward ? Camera.CameraInfo.CAMERA_FACING_BACK : Camera.CameraInfo.CAMERA_FACING_FRONT;
@@ -195,106 +278,10 @@ public class CameraGLSurfaceView extends GLSurfaceView implements GLSurfaceView.
         cameraInstance().focusAtPoint(y, 1.0f - x, focusCallback);
     }
 
-    @Override
-    public void surfaceDestroyed(SurfaceHolder holder) {
-        super.surfaceDestroyed(holder);
-        cameraInstance().stopCamera();
-    }
-
-    public interface OnCreateCallback {
-        void createOver();
-    }
-
-    protected OnCreateCallback mOnCreateCallback;
-
-    //定制一些初始化操作
-    public void setOnCreateCallback(final OnCreateCallback callback) {
-        mOnCreateCallback = callback;
-    }
-
-    @Override
-    public void onSurfaceCreated(GL10 gl, EGLConfig config) {
-        Log.i(LOG_TAG, "onSurfaceCreated...");
-
-        GLES20.glDisable(GLES20.GL_DEPTH_TEST);
-        GLES20.glDisable(GLES20.GL_STENCIL_TEST);
-        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
-
-        int texSize[] = new int[1];
-
-        GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, texSize, 0);
-        mMaxTextureSize = texSize[0];
-
-        if (mOnCreateCallback != null) {
-            mOnCreateCallback.createOver();
-        }
-    }
-
-    @Override
-    public void onSurfaceChanged(GL10 gl, int width, int height) {
-        Log.i(LOG_TAG, String.format("onSurfaceChanged: %d x %d", width, height));
-
-        GLES20.glClearColor(0, 0, 0, 0);
-
-        mViewWidth = width;
-        mViewHeight = height;
-
-        calcViewport();
-    }
-
-    @Override
-    public void onDrawFrame(GL10 gl) {
-        //Nothing . See `CameraGLSurfaceViewWithTexture` or `CameraGLSurfaceViewWithBuffer`
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        Log.i(LOG_TAG, "glsurfaceview onResume...");
-    }
-
-    @Override
-    public void onPause() {
-        Log.i(LOG_TAG, "glsurfaceview onPause in...");
-
-        cameraInstance().stopCamera();
-        super.onPause();
-        Log.i(LOG_TAG, "glsurfaceview onPause out...");
-    }
-
-    public interface ReleaseOKCallback {
-
-        void releaseOK();
-    }
-
-    protected void onRelease() {
-
-    }
-
-    public final void release(final ReleaseOKCallback callback) {
-        queueEvent(new Runnable() {
-            @Override
-            public void run() {
-
-                onRelease();
-
-                Log.i(LOG_TAG, "GLSurfaceview release...");
-                if (callback != null)
-                    callback.releaseOK();
-            }
-        });
-    }
-
-    public interface TakePictureCallback {
-        //You can recycle the bitmap.
-        void takePictureOK(Bitmap bmp);
-    }
-
     public void takeShot(final TakePictureCallback callback) {
     }
 
     protected void calcViewport() {
-
         float scaling = mRecordWidth / (float) mRecordHeight;
         float viewRatio = mViewWidth / (float) mViewHeight;
         float s = scaling / viewRatio;
@@ -326,5 +313,18 @@ public class CameraGLSurfaceView extends GLSurfaceView implements GLSurfaceView.
         mDrawViewport.x = (mViewWidth - mDrawViewport.width) / 2;
         mDrawViewport.y = (mViewHeight - mDrawViewport.height) / 2;
         Log.i(LOG_TAG, String.format("View port: %d, %d, %d, %d", mDrawViewport.x, mDrawViewport.y, mDrawViewport.width, mDrawViewport.height));
+    }
+
+    public interface OnCreateCallback {
+        void createOver();
+    }
+
+    public interface ReleaseOKCallback {
+        void releaseOK();
+    }
+
+    public interface TakePictureCallback {
+        //You can recycle the bitmap.
+        void takePictureOK(Bitmap bmp);
     }
 }

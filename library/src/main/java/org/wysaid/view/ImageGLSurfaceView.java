@@ -1,5 +1,8 @@
 package org.wysaid.view;
 
+import android.arch.lifecycle.Lifecycle;
+import android.arch.lifecycle.LifecycleObserver;
+import android.arch.lifecycle.OnLifecycleEvent;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.PixelFormat;
@@ -21,7 +24,7 @@ import javax.microedition.khronos.opengles.GL10;
  * Mail: admin@wysaid.org
  * blog: wysaid.org
  */
-public class ImageGLSurfaceView extends GLSurfaceView implements Renderer {
+public class ImageGLSurfaceView extends GLSurfaceView implements Renderer, LifecycleObserver {
 
     public static final String LOG_TAG = Common.LOG_TAG;
 
@@ -33,16 +36,104 @@ public class ImageGLSurfaceView extends GLSurfaceView implements Renderer {
 
     protected CGEImageHandler mImageHandler;
     protected float mFilterIntensity = 1.0f;
-
-    public CGEImageHandler getImageHandler() {
-        return mImageHandler;
-    }
-
     protected TextureRenderer.Viewport mRenderViewport = new TextureRenderer.Viewport();
     protected int mImageWidth;
     protected int mImageHeight;
     protected int mViewWidth;
     protected int mViewHeight;
+    protected DisplayMode mDisplayMode = DisplayMode.DISPLAY_SCALE_TO_FILL;
+
+    protected final Object mSettingIntensityLock = new Object();
+    protected int mSettingIntensityCount = 1;
+
+    protected OnSurfaceCreatedCallback mSurfaceCreatedCallback;
+
+    public ImageGLSurfaceView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+
+        setEGLContextClientVersion(2);
+        setEGLConfigChooser(8, 8, 8, 8, 8, 0);
+        getHolder().setFormat(PixelFormat.RGBA_8888);
+        setRenderer(this);
+        setRenderMode(RENDERMODE_WHEN_DIRTY);
+//        setZOrderMediaOverlay(true);
+
+        Log.i(LOG_TAG, "ImageGLSurfaceView Construct...");
+    }
+
+    @Override
+    public void onSurfaceCreated(GL10 gl, EGLConfig config) {
+        Log.i(LOG_TAG, "ImageGLSurfaceView onSurfaceCreated...");
+
+        GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+        GLES20.glDisable(GLES20.GL_STENCIL_TEST);
+
+        mImageHandler = new CGEImageHandler();
+
+        mImageHandler.setDrawerFlipScale(1.0f, -1.0f);
+
+        if (mSurfaceCreatedCallback != null) {
+            mSurfaceCreatedCallback.surfaceCreated();
+        }
+    }
+
+    @Override
+    public void onSurfaceChanged(GL10 gl, int width, int height) {
+        GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        mViewWidth = width;
+        mViewHeight = height;
+        calcViewport();
+    }
+
+    @Override
+    public void onDrawFrame(GL10 gl) {
+
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+
+        if (mImageHandler == null)
+            return;
+
+        GLES20.glViewport(mRenderViewport.x, mRenderViewport.y, mRenderViewport.width, mRenderViewport.height);
+        mImageHandler.drawResult();
+    }
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+    @Override
+    public void onPause() {
+        super.onPause();
+    }
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+    public void release() {
+        if (mImageHandler != null) {
+            queueEvent(new Runnable() {
+                @Override
+                public void run() {
+                    Log.i(LOG_TAG, "ImageGLSurfaceView release...");
+
+                    if (mImageHandler != null) {
+                        mImageHandler.release();
+                        mImageHandler = null;
+                    }
+                }
+            });
+        }
+    }
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)
+    @Override
+    public void onResume() {
+        super.onResume();
+    }
+
+    public void setSurfaceCreatedCallback(OnSurfaceCreatedCallback callback) {
+        mSurfaceCreatedCallback = callback;
+    }
+
+    public CGEImageHandler getImageHandler() {
+        return mImageHandler;
+    }
 
     public int getImageWidth() {
         return mImageWidth;
@@ -51,8 +142,6 @@ public class ImageGLSurfaceView extends GLSurfaceView implements Renderer {
     public int getImageheight() {
         return mImageHeight;
     }
-
-    protected DisplayMode mDisplayMode = DisplayMode.DISPLAY_SCALE_TO_FILL;
 
     public DisplayMode getDisplayMode() {
         return mDisplayMode;
@@ -82,9 +171,6 @@ public class ImageGLSurfaceView extends GLSurfaceView implements Renderer {
             }
         });
     }
-
-    protected final Object mSettingIntensityLock = new Object();
-    protected int mSettingIntensityCount = 1;
 
     public void setFilterIntensityForIndex(final float intensity, final int index) {
         setFilterIntensityForIndex(intensity, index, true);
@@ -193,12 +279,7 @@ public class ImageGLSurfaceView extends GLSurfaceView implements Renderer {
         });
     }
 
-    public interface QueryResultBitmapCallback {
-        void get(Bitmap bmp);
-    }
-
     public void getResultBitmap(final QueryResultBitmapCallback callback) {
-
         if (callback == null)
             return;
 
@@ -212,86 +293,7 @@ public class ImageGLSurfaceView extends GLSurfaceView implements Renderer {
         });
     }
 
-
-    public ImageGLSurfaceView(Context context, AttributeSet attrs) {
-        super(context, attrs);
-
-        setEGLContextClientVersion(2);
-        setEGLConfigChooser(8, 8, 8, 8, 8, 0);
-        getHolder().setFormat(PixelFormat.RGBA_8888);
-        setRenderer(this);
-        setRenderMode(RENDERMODE_WHEN_DIRTY);
-//        setZOrderMediaOverlay(true);
-
-        Log.i(LOG_TAG, "ImageGLSurfaceView Construct...");
-    }
-
-    public interface OnSurfaceCreatedCallback {
-        void surfaceCreated();
-    }
-
-    protected OnSurfaceCreatedCallback mSurfaceCreatedCallback;
-
-    public void setSurfaceCreatedCallback(OnSurfaceCreatedCallback callback) {
-        mSurfaceCreatedCallback = callback;
-    }
-
-    @Override
-    public void onSurfaceCreated(GL10 gl, EGLConfig config) {
-        Log.i(LOG_TAG, "ImageGLSurfaceView onSurfaceCreated...");
-
-        GLES20.glDisable(GLES20.GL_DEPTH_TEST);
-        GLES20.glDisable(GLES20.GL_STENCIL_TEST);
-
-        mImageHandler = new CGEImageHandler();
-
-        mImageHandler.setDrawerFlipScale(1.0f, -1.0f);
-
-        if (mSurfaceCreatedCallback != null) {
-            mSurfaceCreatedCallback.surfaceCreated();
-        }
-    }
-
-    @Override
-    public void onSurfaceChanged(GL10 gl, int width, int height) {
-        GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-        mViewWidth = width;
-        mViewHeight = height;
-        calcViewport();
-    }
-
-    @Override
-    public void onDrawFrame(GL10 gl) {
-
-        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
-
-        if (mImageHandler == null)
-            return;
-
-        GLES20.glViewport(mRenderViewport.x, mRenderViewport.y, mRenderViewport.width, mRenderViewport.height);
-        mImageHandler.drawResult();
-    }
-
-    public void release() {
-
-        if (mImageHandler != null) {
-            queueEvent(new Runnable() {
-                @Override
-                public void run() {
-                    Log.i(LOG_TAG, "ImageGLSurfaceView release...");
-
-                    if (mImageHandler != null) {
-                        mImageHandler.release();
-                        mImageHandler = null;
-                    }
-                }
-            });
-        }
-    }
-
     protected void calcViewport() {
-
         if (mDisplayMode == DisplayMode.DISPLAY_SCALE_TO_FILL) {
             mRenderViewport.x = 0;
             mRenderViewport.y = 0;
@@ -299,14 +301,9 @@ public class ImageGLSurfaceView extends GLSurfaceView implements Renderer {
             mRenderViewport.height = mViewHeight;
             return;
         }
-
-        float scaling;
-
-        scaling = mImageWidth / (float) mImageHeight;
-
+        float scaling = mImageWidth / (float) mImageHeight;
         float viewRatio = mViewWidth / (float) mViewHeight;
         float s = scaling / viewRatio;
-
         int w, h;
 
         switch (mDisplayMode) {
@@ -338,12 +335,19 @@ public class ImageGLSurfaceView extends GLSurfaceView implements Renderer {
                 return;
         }
 
-
         mRenderViewport.width = w;
         mRenderViewport.height = h;
         mRenderViewport.x = (mViewWidth - w) / 2;
         mRenderViewport.y = (mViewHeight - h) / 2;
 
         Log.i(LOG_TAG, String.format("View port: %d, %d, %d, %d", mRenderViewport.x, mRenderViewport.y, mRenderViewport.width, mRenderViewport.height));
+    }
+
+    public interface QueryResultBitmapCallback {
+        void get(Bitmap bmp);
+    }
+
+    public interface OnSurfaceCreatedCallback {
+        void surfaceCreated();
     }
 }

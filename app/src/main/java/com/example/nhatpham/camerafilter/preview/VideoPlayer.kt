@@ -160,12 +160,11 @@ internal class VideoPlayer(val context: Context) : IPlayer {
 
         override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
             when (playbackState) {
-                Player.STATE_IDLE, Player.STATE_BUFFERING, Player.STATE_READY -> {
-                    notifyStateChanged(currentState)
-                }
                 Player.STATE_ENDED -> {
                     stop()
                     currentUri?.let { notifyComplete(it) }
+                } else -> {
+                    notifyStateChanged(currentState)
                 }
             }
         }

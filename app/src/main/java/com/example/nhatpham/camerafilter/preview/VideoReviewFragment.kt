@@ -5,10 +5,8 @@ import android.animation.AnimatorListenerAdapter
 import android.arch.lifecycle.LiveData
 import android.arch.lifecycle.Observer
 import android.databinding.DataBindingUtil
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
-import android.support.v4.app.Fragment
 import android.support.v7.widget.LinearLayoutManager
 import android.util.Log
 import android.view.LayoutInflater
@@ -21,6 +19,7 @@ import org.wysaid.common.Common
 import android.os.Handler
 import android.os.SystemClock
 import android.text.format.DateUtils
+import androidx.core.os.bundleOf
 import androidx.work.OneTimeWorkRequest
 import androidx.work.State
 import androidx.work.WorkManager
@@ -38,7 +37,7 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
 
-internal class VideoPreviewFragment : Fragment() {
+internal class VideoReviewFragment : ViewLifecycleFragment(), View.OnClickListener {
 
     private lateinit var mBinding: FragmentVideoPreviewBinding
     private val video: Video? by lazy {
@@ -58,9 +57,12 @@ internal class VideoPreviewFragment : Fragment() {
     private lateinit var previewFiltersAdapter: PreviewFiltersAdapter
     private val currentConfig
         get() = videoPreviewViewModel.currentConfigLiveData.value ?: NONE_CONFIG
+
+    private val animShortDuration by lazy {
+        resources.getInteger(android.R.integer.config_shortAnimTime).toLong()
+    }
     private var lastIntervalUpdate = 0L
     private var isCompleted = true
-    private val playListener = PlayListener()
 
     private lateinit var videoController: VideoController
 
@@ -108,26 +110,11 @@ internal class VideoPreviewFragment : Fragment() {
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_video_preview, container, false)
-        initialize()
+        initUI()
         return mBinding.root
     }
 
-    private fun initialize() {
-        mainViewModel = getViewModel(activity!!)
-        videoPreviewViewModel = getViewModel(this)
-
-        videoPreviewViewModel.showFiltersEvent.observe(viewLifecycleOwner, Observer { active ->
-            showFilters(active ?: false)
-        })
-        videoPreviewViewModel.currentConfigLiveData.value = video?.config ?: NONE_CONFIG
-        videoPreviewViewModel.currentConfigLiveData.observe(viewLifecycleOwner, Observer { newConfig ->
-            if (newConfig != null) {
-                mBinding.videoView.setFilterWithConfig(newConfig.value)
-                mBinding.tvFilterName.text = newConfig.name
-                previewFiltersAdapter.setNewConfig(newConfig)
-            }
-        })
-
+    private fun initUI() {
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
         previewFiltersAdapter = PreviewFiltersAdapter(context!!, EFFECT_CONFIGS, object : PreviewFiltersAdapter.OnItemInteractListener {
             override fun onConfigSelected(selectedConfig: Config) {
@@ -138,27 +125,179 @@ internal class VideoPreviewFragment : Fragment() {
         val pos = previewFiltersAdapter.findConfigPos(video?.config ?: NONE_CONFIG)
         mBinding.rcImgPreview.scrollToPosition(pos ?: 0)
 
+        mBinding.btnPickStickers.setOnClickListener(this)
+        mBinding.btnPickFilters.setOnClickListener(this)
+        mBinding.btnDone.setOnClickListener(this)
+        mBinding.btnBack.setOnClickListener(this)
+        mBinding.videoView.setOnClickListener(this)
+        mBinding.videoView.apply {
+            setZOrderOnTop(false)
+            setFitFullView(true)
+        }
+    }
+
+    override fun onActivityCreated(savedInstanceState: Bundle?) {
+        super.onActivityCreated(savedInstanceState)
+        mainViewModel = getViewModel(activity!!)
+        videoPreviewViewModel = getViewModel(this)
+
+        videoPreviewViewModel.showFiltersEvent.observe(viewLifecycleOwner!!, Observer { active ->
+            showFilters(active ?: false)
+        })
+        videoPreviewViewModel.currentConfigLiveData.value = video?.config ?: NONE_CONFIG
+        videoPreviewViewModel.currentConfigLiveData.observe(viewLifecycleOwner!!, Observer { newConfig ->
+            if (newConfig != null) {
+                mBinding.videoView.setFilterWithConfig(newConfig.value)
+                mBinding.tvFilterName.text = newConfig.name
+                previewFiltersAdapter.setNewConfig(newConfig)
+            }
+        })
+
         videoController = VideoController(VideoPlayer(context!!), mBinding.videoView)
         videoController.addPlayerListener(playerListener)
         video?.uri?.let { videoController.play(it) }
         lifecycle.addObserver(videoController)
+    }
 
-        mBinding.videoView.apply {
-            setZOrderOnTop(false)
-            setFitFullView(true)
-            setOnClickListener(playListener)
+    private fun scheduleRecordTime() {
+        cancelScheduledRecordTime()
+        timeRecordingFuture = scheduler.scheduleAtFixedRate({
+            mainHandler.post(updateTimeIntervalTask)
+        }, PROGRESS_UPDATE_INITIAL_INTERVAL, PROGRESS_UPDATE_INTERNAL, TimeUnit.MILLISECONDS)
+    }
+
+    private fun cancelScheduledRecordTime() {
+        timeRecordingFuture?.cancel(false)
+    }
+
+    private fun showFilters(visible: Boolean) {
+        if (visible) {
+            mBinding.rcImgPreview.post {
+                mBinding.rcImgPreview.alpha = 0.6F
+                mBinding.rcImgPreview.isVisible = true
+            }
+            mBinding.rcImgPreview.post {
+                mBinding.rcImgPreview.animate()
+                        .alpha(1F)
+                        .setDuration(animShortDuration)
+                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .start()
+            }
+            mBinding.tvFilterName.post {
+                mBinding.tvFilterName.alpha = 0.6F
+                mBinding.tvFilterName.text = videoPreviewViewModel.currentConfigLiveData.value?.name
+                mBinding.tvFilterName.isVisible = true
+            }
+            mBinding.tvFilterName.post {
+                mBinding.tvFilterName.animate()
+                        .alpha(1F)
+                        .setDuration(animShortDuration)
+                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .start()
+            }
+            mBinding.btnPickFilters.isSelected = true
+        } else {
+            mBinding.rcImgPreview.animate()
+                    .alpha(0F)
+                    .setDuration(animShortDuration)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator?) {
+                            mBinding.rcImgPreview.animate().setListener(null)
+                            mBinding.rcImgPreview.isVisible = false
+                        }
+                    }).start()
+            mBinding.tvFilterName.animate()
+                    .alpha(0F)
+                    .setDuration(animShortDuration)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator?) {
+                            mBinding.tvFilterName.animate().setListener(null)
+                            mBinding.tvFilterName.isVisible = false
+                        }
+                    })
+                    .start()
+            mBinding.btnPickFilters.isSelected = false
         }
+    }
 
-        mBinding.btnPickStickers.setOnClickListener {
-            mBinding.btnPickStickers.isSelected = !mBinding.btnPickStickers.isSelected
+    override fun onResume() {
+        super.onResume()
+        videoController.addPlayerListener(playerListener)
+    }
+
+    override fun onDestroy() {
+        scheduler.shutdown()
+        video?.let {
+            if (it.isFromCamera())
+                checkToDeleteTempFile(it.uri)
         }
+        super.onDestroy()
+    }
 
-        mBinding.btnPickFilters.setOnClickListener {
-            videoPreviewViewModel.showFiltersEvent.value = videoPreviewViewModel.showFiltersEvent.value?.not() ?: true
+    private fun checkToDeleteTempFile(uri: Uri) {
+        if (isFileUri(uri)) {
+            File(uri.path).apply {
+                if (exists()) {
+                    delete()
+                    activity?.let {
+                        reScanFile(it, uri)
+                    }
+                }
+            }
         }
+    }
 
-        mBinding.btnDone.setOnClickListener { saveVideo() }
-        mBinding.btnBack.setOnClickListener { exit() }
+    override fun onClick(v: View?) {
+        when (v) {
+            mBinding.btnPickFilters -> toggleFilters()
+            mBinding.btnPickStickers -> toggleStickers()
+            mBinding.videoView -> checkToPlay()
+            mBinding.btnBack -> exit()
+            mBinding.btnDone -> saveVideo()
+        }
+    }
+
+    private fun toggleFilters() {
+        videoPreviewViewModel.showFiltersEvent.value = videoPreviewViewModel.showFiltersEvent.value?.not() ?: true
+    }
+
+    private fun toggleStickers() {
+        mBinding.btnPickStickers.isSelected = !mBinding.btnPickStickers.isSelected
+    }
+
+    private fun checkToPlay() {
+        mBinding.videoView.isVisible = true
+
+        val uri = video?.uri
+        if (uri != null) {
+            if (isCompleted) {
+                isCompleted = false
+                mBinding.videoView.setFilterWithConfig(currentConfig.value)
+                lastIntervalUpdate = SystemClock.elapsedRealtime() + PROGRESS_UPDATE_INITIAL_INTERVAL
+
+                videoController.play(uri)
+            } else {
+                when (videoController.currentState.state) {
+                    PlayerState.STATE_PAUSED -> {
+                        lastIntervalUpdate = SystemClock.elapsedRealtime() - videoController.currentPosition + PROGRESS_UPDATE_INITIAL_INTERVAL
+                        videoController.play(uri)
+                    }
+                    PlayerState.STATE_PLAYING -> {
+                        videoController.pause()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun exit() {
+        activity?.run {
+            if(supportFragmentManager.backStackEntryCount == 0)
+                finish()
+            else supportFragmentManager.popBackStack()
+        }
     }
 
     private fun saveVideo() {
@@ -193,7 +332,7 @@ internal class VideoPreviewFragment : Fragment() {
                     return
                 }
 
-                scheduleGenerateFilteredVideoNow(inputPath, currentConfig.value, videoPathToSave)?.observe(viewLifecycleOwner,
+                scheduleGenerateFilteredVideoNow(inputPath, currentConfig.value, videoPathToSave)?.observe(viewLifecycleOwner!!,
                         Observer { workStatus ->
                             if (workStatus != null) {
                                 if (workStatus.state.isFinished) {
@@ -235,144 +374,14 @@ internal class VideoPreviewFragment : Fragment() {
         return null
     }
 
-    private fun scheduleRecordTime() {
-        cancelScheduledRecordTime()
-        timeRecordingFuture = scheduler.scheduleAtFixedRate({
-            mainHandler.post(updateTimeIntervalTask)
-        }, PROGRESS_UPDATE_INITIAL_INTERVAL, PROGRESS_UPDATE_INTERNAL, TimeUnit.MILLISECONDS)
-    }
-
-    private fun cancelScheduledRecordTime() {
-        timeRecordingFuture?.cancel(false)
-    }
-
-    private fun showFilters(visible: Boolean) {
-        val duration = resources.getInteger(android.R.integer.config_shortAnimTime).toLong()
-
-        if (visible) {
-            mBinding.rcImgPreview.post {
-                mBinding.rcImgPreview.alpha = 0.6F
-                mBinding.rcImgPreview.isVisible = true
-            }
-            mBinding.rcImgPreview.post {
-                mBinding.rcImgPreview.animate()
-                        .alpha(1F)
-                        .setDuration(duration)
-                        .setInterpolator(AccelerateDecelerateInterpolator())
-                        .start()
-            }
-            mBinding.tvFilterName.post {
-                mBinding.tvFilterName.alpha = 0.6F
-                mBinding.tvFilterName.text = videoPreviewViewModel.currentConfigLiveData.value?.name
-                mBinding.tvFilterName.isVisible = true
-            }
-            mBinding.tvFilterName.post {
-                mBinding.tvFilterName.animate()
-                        .alpha(1F)
-                        .setDuration(duration)
-                        .setInterpolator(AccelerateDecelerateInterpolator())
-                        .start()
-            }
-            mBinding.btnPickFilters.isSelected = true
-        } else {
-            mBinding.rcImgPreview.animate()
-                    .alpha(0F)
-                    .setDuration(duration)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .setListener(object : AnimatorListenerAdapter() {
-                        override fun onAnimationEnd(animation: Animator?) {
-                            mBinding.rcImgPreview.animate().setListener(null)
-                            mBinding.rcImgPreview.isVisible = false
-                        }
-                    }).start()
-            mBinding.tvFilterName.animate()
-                    .alpha(0F)
-                    .setDuration(duration)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .setListener(object : AnimatorListenerAdapter() {
-                        override fun onAnimationEnd(animation: Animator?) {
-                            mBinding.tvFilterName.animate().setListener(null)
-                            mBinding.tvFilterName.isVisible = false
-                        }
-                    })
-                    .start()
-            mBinding.btnPickFilters.isSelected = false
-        }
-    }
-
-    private fun exit() {
-        activity?.run {
-            if(supportFragmentManager.backStackEntryCount == 0)
-                finish()
-            else supportFragmentManager.popBackStack()
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        videoController.addPlayerListener(playerListener)
-    }
-
-    override fun onDestroy() {
-        scheduler.shutdown()
-        video?.let {
-            if (it.isFromCamera())
-                checkToDeleteTempFile(it.uri)
-        }
-        super.onDestroy()
-    }
-
-    private fun checkToDeleteTempFile(uri: Uri) {
-        if (isFileUri(uri)) {
-            File(uri.path).apply {
-                if (exists()) {
-                    delete()
-                    activity?.let {
-                        reScanFile(it, uri)
-                    }
-                }
-            }
-        }
-    }
-
-    private inner class PlayListener : View.OnClickListener {
-
-        override fun onClick(view: View?) {
-            mBinding.videoView.isVisible = true
-
-            val uri = video?.uri
-            if (uri != null) {
-                if (isCompleted) {
-                    isCompleted = false
-                    mBinding.videoView.setFilterWithConfig(currentConfig.value)
-                    lastIntervalUpdate = SystemClock.elapsedRealtime() + PROGRESS_UPDATE_INITIAL_INTERVAL
-
-                    videoController.play(uri)
-                } else {
-                    when (videoController.currentState.state) {
-                        PlayerState.STATE_PAUSED -> {
-                            lastIntervalUpdate = SystemClock.elapsedRealtime() - videoController.currentPosition + PROGRESS_UPDATE_INITIAL_INTERVAL
-                            videoController.play(uri)
-                        }
-                        PlayerState.STATE_PLAYING -> {
-                            videoController.pause()
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     companion object {
-        private const val EXTRA_VIDEO = "EXTRA_VIDEO"
+        private const val EXTRA_VIDEO = "video"
         private const val PROGRESS_UPDATE_INTERNAL: Long = 1000
         private const val PROGRESS_UPDATE_INITIAL_INTERVAL: Long = 100
 
-        fun newInstance(video: Video): VideoPreviewFragment {
-            return VideoPreviewFragment().apply {
-                arguments = Bundle().apply {
-                    putParcelable(EXTRA_VIDEO, video)
-                }
+        fun newInstance(video: Video): VideoReviewFragment {
+            return VideoReviewFragment().apply {
+                arguments = bundleOf(EXTRA_VIDEO to video)
             }
         }
     }

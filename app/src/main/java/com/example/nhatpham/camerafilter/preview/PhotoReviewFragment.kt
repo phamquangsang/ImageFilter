@@ -7,7 +7,6 @@ import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
-import android.support.v4.app.Fragment
 import android.support.v7.widget.LinearLayoutManager
 import android.view.LayoutInflater
 import android.view.View
@@ -21,6 +20,7 @@ import com.example.nhatpham.camerafilter.databinding.FragmentPhotoPreviewBinding
 import org.wysaid.view.ImageGLSurfaceView
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Toast
+import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
 import com.bumptech.glide.request.RequestOptions
 import com.example.nhatpham.camerafilter.*
@@ -33,7 +33,7 @@ import org.wysaid.myUtils.ImageUtil
 import java.io.File
 
 
-internal class PhotoPreviewFragment : Fragment() {
+internal class PhotoReviewFragment : ViewLifecycleFragment(), View.OnClickListener {
 
     private lateinit var mBinding: FragmentPhotoPreviewBinding
     private val photo: Photo? by lazy {
@@ -46,39 +46,21 @@ internal class PhotoPreviewFragment : Fragment() {
     private lateinit var mainViewModel: MainViewModel
     private lateinit var photoPreviewViewModel: PhotoPreviewViewModel
     private lateinit var previewFiltersAdapter: PreviewFiltersAdapter
+
+    private val animShortDuration by lazy {
+        resources.getInteger(android.R.integer.config_shortAnimTime).toLong()
+    }
     private var currentBitmap: Bitmap? = null
     private val currentConfig
         get() = photoPreviewViewModel.currentConfigLiveData.value ?: NONE_CONFIG
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_photo_preview, container, false)
-        initialize()
+        initUI()
         return mBinding.root
     }
 
-    private fun initialize() {
-        mainViewModel = getViewModel(activity!!)
-        photoPreviewViewModel = getViewModel(this)
-
-        photoPreviewViewModel.showFiltersEvent.observe(viewLifecycleOwner, Observer { active ->
-            showFilters(active ?: false)
-        })
-
-        photoPreviewViewModel.currentConfigLiveData.value = photo?.config ?: NONE_CONFIG
-        photoPreviewViewModel.currentConfigLiveData.observe(viewLifecycleOwner, Observer { newConfig ->
-            if (newConfig != null) {
-                mBinding.imageView.setFilterWithConfig(newConfig.value)
-                mBinding.tvFilterName.text = newConfig.name
-                previewFiltersAdapter.setNewConfig(newConfig)
-            }
-        })
-
-        mBinding.imageView.displayMode = ImageGLSurfaceView.DisplayMode.DISPLAY_ASPECT_FILL
-        mBinding.imageView.setSurfaceCreatedCallback {
-            mBinding.imageView.setImageBitmap(currentBitmap)
-            mBinding.imageView.setFilterWithConfig(photoPreviewViewModel.currentConfigLiveData.value?.value)
-        }
-
+    private fun initUI() {
         mBinding.rcImgPreview.layoutManager = LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false)
         previewFiltersAdapter = PreviewFiltersAdapter(context!!, EFFECT_CONFIGS, object : PreviewFiltersAdapter.OnItemInteractListener {
             override fun onConfigSelected(selectedConfig: Config) {
@@ -91,49 +73,17 @@ internal class PhotoPreviewFragment : Fragment() {
         val pos = previewFiltersAdapter.findConfigPos(photo?.config ?: NONE_CONFIG)
         mBinding.rcImgPreview.scrollToPosition(pos ?: 0)
 
-        mBinding.btnPickStickers.setOnClickListener {
-            mBinding.btnPickStickers.isSelected = mBinding.btnPickStickers.isSelected.not()
+        mBinding.btnPickStickers.setOnClickListener(this)
+        mBinding.btnPickFilters.setOnClickListener(this)
+        mBinding.btnDone.setOnClickListener(this)
+        mBinding.btnBack.setOnClickListener(this)
+
+        lifecycle.addObserver(mBinding.imageView)
+        mBinding.imageView.displayMode = ImageGLSurfaceView.DisplayMode.DISPLAY_ASPECT_FILL
+        mBinding.imageView.setSurfaceCreatedCallback {
+            mBinding.imageView.setImageBitmap(currentBitmap)
+            mBinding.imageView.setFilterWithConfig(photoPreviewViewModel.currentConfigLiveData.value?.value)
         }
-
-        mBinding.btnPickFilters.setOnClickListener {
-            photoPreviewViewModel.showFiltersEvent.value = photoPreviewViewModel.showFiltersEvent.value?.not() ?: true
-        }
-
-        mBinding.btnDone.setOnClickListener {
-            mBinding.imageView.getResultBitmap { bitmap ->
-                val currentPhoto = photo
-                if (bitmap != null && currentPhoto != null) {
-                    val photoUri = currentPhoto.uri
-
-                    if (currentPhoto.isFromGallery() && currentConfig == NONE_CONFIG) {
-                        val path = when {
-                            isMediaStoreImageUri(photoUri) -> getPathFromMediaUri(context!!, photoUri)
-                            isFileUri(photoUri) -> photoUri.path
-                            else -> null
-                        }
-                        if (path != null)
-                            mainViewModel.doneEditEvent.postValue(Uri.parse(path))
-                        else
-                            mainViewModel.doneEditEvent.postValue(null)
-                    } else {
-                        if (isExternalStorageWritable()) {
-                            val filePath = ImageUtil.saveBitmap(bitmap, imagePathToSave)
-                            if (!filePath.isNullOrEmpty()) {
-                                mainViewModel.doneEditEvent.postValue(Uri.fromFile(File(filePath)).also {
-                                    reScanFile(it)
-                                })
-                            } else {
-                                Toast.makeText(context, "Cannot save", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
-                } else {
-                    mainViewModel.doneEditEvent.postValue(null)
-                }
-            }
-        }
-        mBinding.btnBack.setOnClickListener { exit() }
-
         mBinding.imageView.afterMeasured {
             Glide.with(this)
                     .asBitmap()
@@ -156,9 +106,26 @@ internal class PhotoPreviewFragment : Fragment() {
         }
     }
 
-    private fun showFilters(visible: Boolean) {
-        val duration = resources.getInteger(android.R.integer.config_shortAnimTime).toLong()
+    override fun onActivityCreated(savedInstanceState: Bundle?) {
+        super.onActivityCreated(savedInstanceState)
+        mainViewModel = getViewModel(activity!!)
+        photoPreviewViewModel = getViewModel(this)
 
+        photoPreviewViewModel.showFiltersEvent.observe(viewLifecycleOwner!!, Observer { active ->
+            showFilters(active ?: false)
+        })
+
+        photoPreviewViewModel.currentConfigLiveData.value = photo?.config ?: NONE_CONFIG
+        photoPreviewViewModel.currentConfigLiveData.observe(viewLifecycleOwner!!, Observer { newConfig ->
+            if (newConfig != null) {
+                mBinding.imageView.setFilterWithConfig(newConfig.value)
+                mBinding.tvFilterName.text = newConfig.name
+                previewFiltersAdapter.setNewConfig(newConfig)
+            }
+        })
+    }
+
+    private fun showFilters(visible: Boolean) {
         if (visible) {
             mBinding.rcImgPreview.post {
                 mBinding.rcImgPreview.alpha = 0.6F
@@ -167,7 +134,7 @@ internal class PhotoPreviewFragment : Fragment() {
             mBinding.rcImgPreview.post {
                 mBinding.rcImgPreview.animate()
                         .alpha(1F)
-                        .setDuration(duration)
+                        .setDuration(animShortDuration)
                         .setInterpolator(AccelerateDecelerateInterpolator())
                         .start()
             }
@@ -179,7 +146,7 @@ internal class PhotoPreviewFragment : Fragment() {
             mBinding.tvFilterName.post {
                 mBinding.tvFilterName.animate()
                         .alpha(1F)
-                        .setDuration(duration)
+                        .setDuration(animShortDuration)
                         .setInterpolator(AccelerateDecelerateInterpolator())
                         .start()
             }
@@ -187,7 +154,7 @@ internal class PhotoPreviewFragment : Fragment() {
         } else {
             mBinding.rcImgPreview.animate()
                     .alpha(0F)
-                    .setDuration(duration)
+                    .setDuration(animShortDuration)
                     .setInterpolator(AccelerateDecelerateInterpolator())
                     .setListener(object : AnimatorListenerAdapter() {
                         override fun onAnimationEnd(animation: Animator?) {
@@ -197,7 +164,7 @@ internal class PhotoPreviewFragment : Fragment() {
                     }).start()
             mBinding.tvFilterName.animate()
                     .alpha(0F)
-                    .setDuration(duration)
+                    .setDuration(animShortDuration)
                     .setInterpolator(AccelerateDecelerateInterpolator())
                     .setListener(object : AnimatorListenerAdapter() {
                         override fun onAnimationEnd(animation: Animator?) {
@@ -208,31 +175,6 @@ internal class PhotoPreviewFragment : Fragment() {
                     .start()
             mBinding.btnPickFilters.isSelected = false
         }
-    }
-
-    private fun reScanFile(photoUri: Uri) {
-        activity?.let {
-            reScanFile(it, photoUri)
-        }
-    }
-
-    private fun exit() {
-        activity?.run {
-            if(supportFragmentManager.backStackEntryCount == 0)
-                finish()
-            else supportFragmentManager.popBackStack()
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        mBinding.imageView.release()
-        mBinding.imageView.onPause()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        mBinding.imageView.onResume()
     }
 
     override fun onDestroy() {
@@ -254,14 +196,77 @@ internal class PhotoPreviewFragment : Fragment() {
         }
     }
 
-    companion object {
-        private const val EXTRA_PHOTO = "EXTRA_PHOTO"
+    override fun onClick(v: View?) {
+        when (v) {
+            mBinding.btnBack -> exit()
+            mBinding.btnDone -> saveImage()
+            mBinding.btnPickFilters -> toggleFilters()
+            mBinding.btnPickStickers -> toggleStickers()
+        }
+    }
 
-        fun newInstance(photo: Photo): PhotoPreviewFragment {
-            return PhotoPreviewFragment().apply {
-                arguments = Bundle().apply {
-                    putParcelable(EXTRA_PHOTO, photo)
+    private fun exit() {
+        activity?.run {
+            if(supportFragmentManager.backStackEntryCount == 0)
+                finish()
+            else supportFragmentManager.popBackStack()
+        }
+    }
+
+    private fun saveImage() {
+        mBinding.imageView.getResultBitmap { bitmap ->
+            val currentPhoto = photo
+            if (bitmap != null && currentPhoto != null) {
+                val photoUri = currentPhoto.uri
+
+                if (currentPhoto.isFromGallery() && currentConfig == NONE_CONFIG) {
+                    val path = when {
+                        isMediaStoreImageUri(photoUri) -> getPathFromMediaUri(context!!, photoUri)
+                        isFileUri(photoUri) -> photoUri.path
+                        else -> null
+                    }
+                    if (path != null)
+                        mainViewModel.doneEditEvent.postValue(Uri.parse(path))
+                    else
+                        mainViewModel.doneEditEvent.postValue(null)
+                } else {
+                    if (isExternalStorageWritable()) {
+                        val filePath = ImageUtil.saveBitmap(bitmap, imagePathToSave)
+                        if (!filePath.isNullOrEmpty()) {
+                            mainViewModel.doneEditEvent.postValue(Uri.fromFile(File(filePath)).also {
+                                reScanFile(it)
+                            })
+                        } else {
+                            Toast.makeText(context, "Cannot save", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 }
+            } else {
+                mainViewModel.doneEditEvent.postValue(null)
+            }
+        }
+    }
+
+    private fun reScanFile(photoUri: Uri) {
+        activity?.let {
+            reScanFile(it, photoUri)
+        }
+    }
+
+    private fun toggleFilters() {
+        photoPreviewViewModel.showFiltersEvent.value = photoPreviewViewModel.showFiltersEvent.value?.not() ?: true
+    }
+
+    private fun toggleStickers() {
+        mBinding.btnPickStickers.isSelected = mBinding.btnPickStickers.isSelected.not()
+    }
+
+    companion object {
+        private const val EXTRA_PHOTO = "photo"
+
+        fun newInstance(photo: Photo): PhotoReviewFragment {
+            return PhotoReviewFragment().apply {
+                arguments = bundleOf(EXTRA_PHOTO to photo)
             }
         }
     }
