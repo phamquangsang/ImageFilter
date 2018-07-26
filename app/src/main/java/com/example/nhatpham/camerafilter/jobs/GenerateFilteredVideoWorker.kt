@@ -1,6 +1,8 @@
 package com.example.nhatpham.camerafilter.jobs
 
+import android.media.ThumbnailUtils
 import android.net.Uri
+import android.provider.MediaStore
 import androidx.work.Data
 import androidx.work.Worker
 import com.example.nhatpham.camerafilter.utils.isExternalStorageWritable

@@ -3,28 +3,39 @@ package com.example.nhatpham.camerafilter.gallery
 import android.content.ContentUris
 import android.databinding.DataBindingUtil
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.provider.MediaStore
+import android.support.transition.TransitionInflater
+import android.support.transition.TransitionSet
+import android.support.v4.app.SharedElementCallback
 import android.support.v7.widget.GridLayoutManager
 import com.example.nhatpham.camerafilter.*
 import com.example.nhatpham.camerafilter.databinding.FragmentGalleryBinding
 import com.example.nhatpham.camerafilter.models.Photo
 import com.example.nhatpham.camerafilter.models.Source
 import com.example.nhatpham.camerafilter.models.Video
+import com.example.nhatpham.camerafilter.preview.PhotoReviewFragment
+import com.example.nhatpham.camerafilter.preview.VideoReviewFragment
 import com.example.nhatpham.camerafilter.utils.getViewModel
 import org.jetbrains.anko.doAsync
 import org.jetbrains.anko.uiThread
 import kotlin.Comparator
 import kotlin.collections.ArrayList
+import android.view.View.OnLayoutChangeListener
+
 
 internal class GalleryFragment : Fragment() {
 
     private lateinit var mBinding: FragmentGalleryBinding
     private lateinit var mainViewModel: MainViewModel
+    private lateinit var thumbnailsAdapter: ThumbnailsAdapter
+    val lastSelectedItemPos get() = lastSelectedItemPosInternal
+    private var lastSelectedItemPosInternal = 0
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_gallery, container, false)
@@ -38,7 +49,51 @@ internal class GalleryFragment : Fragment() {
         mBinding.rcImages.layoutManager = GridLayoutManager(context, 3, GridLayoutManager.VERTICAL, false)
         mBinding.rcImages.addItemDecoration(SpacesItemDecoration(resources.getDimensionPixelSize(R.dimen.gallery_space_item_size)))
 
+        thumbnailsAdapter = ThumbnailsAdapter(this, ArrayList(), object : ThumbnailsAdapter.OnItemInteractListener {
+            override fun onThumbnailSelected(view: View, position: Int) {
+                thumbnailsAdapter.getItem(position)?.let { thumbnail ->
+                    lastSelectedItemPosInternal = position
+                    if (thumbnail.isVideo) {
+                        val videoUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, thumbnail.id)
+                        showVideoReviewFragment(Video(videoUri, NONE_CONFIG, Source.GALLERY), view)
+                    } else {
+                        val photoUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, thumbnail.id)
+                        showPhotoReviewFragment(Photo(photoUri, NONE_CONFIG, Source.GALLERY), view)
+                    }
+                }
+            }
+        })
+        mBinding.rcImages.adapter = thumbnailsAdapter
 
+        mBinding.btnBack.setOnClickListener {
+            activity?.supportFragmentManager?.popBackStack()
+        }
+
+        prepareExitTransitions()
+        postponeEnterTransition()
+    }
+
+    private fun prepareExitTransitions() {
+        val animShortDuration = resources.getInteger(android.R.integer.config_shortAnimTime).toLong()
+        val inflatedExitTransition = TransitionInflater.from(context).inflateTransition(R.transition.grid_exit_fade_transition)
+        inflatedExitTransition.duration = animShortDuration
+        exitTransition = inflatedExitTransition
+
+        setExitSharedElementCallback(object : SharedElementCallback() {
+            override fun onMapSharedElements(names: MutableList<String>?, sharedElements: MutableMap<String, View>?) {
+                // Locate the ViewHolder for the clicked position.
+                val selectedViewHolder = mBinding.rcImages.findViewHolderForAdapterPosition(lastSelectedItemPosInternal)
+                if (selectedViewHolder?.itemView == null) {
+                    return
+                }
+                // Map the first shared element name to the child ImageView.
+                sharedElements!![names!![0]] = selectedViewHolder.itemView.findViewById(R.id.image)
+            }
+        })
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
         doAsync {
             val thumbnails = ArrayList<Thumbnail>().apply {
                 when (PREVIEW_TYPE) {
@@ -53,27 +108,43 @@ internal class GalleryFragment : Fragment() {
             }
             uiThread {
                 val adapter = mBinding.rcImages.adapter
-                if(adapter is ThumbnailsAdapter) {
+                if (adapter is ThumbnailsAdapter) {
                     adapter.setThumbnails(thumbnails)
                     adapter.notifyDataSetChanged()
+                    scrollToPosition()
                 }
             }
         }
+    }
 
-        mBinding.rcImages.adapter = ThumbnailsAdapter(ArrayList(), object : ThumbnailsAdapter.OnItemInteractListener {
-            override fun onThumbnailSelected(thumbnail: Thumbnail) {
-                if (thumbnail.isVideo) {
-                    val videoUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, thumbnail.id)
-                    mainViewModel.openVideoPreviewEvent.value = Video(videoUri, NONE_CONFIG, Source.GALLERY)
-                } else {
-                    val photoUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, thumbnail.id)
-                    mainViewModel.openPhotoPreviewEvent.value = Photo(photoUri, NONE_CONFIG, Source.GALLERY)
+    /**
+     * Scrolls the recycler view to show the last viewed item in the grid. This is important when
+     * navigating back from the grid.
+     */
+    private fun scrollToPosition() {
+        mBinding.rcImages.addOnLayoutChangeListener(object : OnLayoutChangeListener {
+            override fun onLayoutChange(v: View,
+                                        left: Int,
+                                        top: Int,
+                                        right: Int,
+                                        bottom: Int,
+                                        oldLeft: Int,
+                                        oldTop: Int,
+                                        oldRight: Int,
+                                        oldBottom: Int) {
+                mBinding.rcImages.removeOnLayoutChangeListener(this)
+                val layoutManager = mBinding.rcImages.layoutManager
+                val viewAtPosition = layoutManager.findViewByPosition(lastSelectedItemPosInternal)
+                // Scroll to position if the view for the current position is null (not currently part of
+                // layout manager children), or it's not completely visible.
+                if (viewAtPosition == null || layoutManager.isViewPartiallyVisible(viewAtPosition,
+                                false, true)) {
+                    mBinding.rcImages.post {
+                        layoutManager.scrollToPosition(lastSelectedItemPosInternal)
+                    }
                 }
             }
         })
-        mBinding.btnBack.setOnClickListener {
-            activity?.supportFragmentManager?.popBackStack()
-        }
     }
 
     private fun getImageThumbnails(): ArrayList<Thumbnail> {
@@ -147,6 +218,44 @@ internal class GalleryFragment : Fragment() {
         }
         cursor.close()
         return null
+    }
+
+    private fun showPhotoReviewFragment(photo: Photo, sharedView: View) {
+        activity?.run {
+            // The 'view' is the card view that was clicked to initiate the transition.
+            (exitTransition as TransitionSet).excludeTarget(sharedView, true)
+
+            supportFragmentManager.beginTransaction()
+                    .also {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            it.setReorderingAllowed(true)
+                                    .addSharedElement(sharedView, sharedView.transitionName)
+                                    .setCustomAnimations(0, 0, 0, 0)
+                        }
+                    }
+                    .hide(this@GalleryFragment)
+                    .add(R.id.fragment_container, PhotoReviewFragment.newInstance(photo))
+                    .addToBackStack(null)
+                    .commit()
+        }
+    }
+
+    private fun showVideoReviewFragment(video: Video, sharedView: View) {
+        activity?.run {
+            // The 'view' is the card view that was clicked to initiate the transition.
+            (exitTransition as TransitionSet).excludeTarget(sharedView, true)
+
+            supportFragmentManager.beginTransaction()
+                    .also {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            it.setReorderingAllowed(true).addSharedElement(sharedView, sharedView.transitionName)
+                        }
+                    }
+                    .hide(this@GalleryFragment)
+                    .add(R.id.fragment_container, VideoReviewFragment.newInstance(video))
+                    .addToBackStack(null)
+                    .commit()
+        }
     }
 
     data class Thumbnail(val id: Long,

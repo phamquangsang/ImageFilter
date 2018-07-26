@@ -6,8 +6,15 @@ import android.arch.lifecycle.Observer
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.support.transition.Transition
+import android.support.transition.TransitionInflater
+import android.support.transition.TransitionListenerAdapter
+import android.support.v4.app.SharedElementCallback
 import android.support.v7.widget.LinearLayoutManager
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -21,16 +28,15 @@ import org.wysaid.view.ImageGLSurfaceView
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Toast
 import androidx.core.os.bundleOf
+import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import com.bumptech.glide.request.RequestOptions
 import com.example.nhatpham.camerafilter.*
-import com.example.nhatpham.camerafilter.models.Config
-import com.example.nhatpham.camerafilter.models.Photo
-import com.example.nhatpham.camerafilter.models.isFromCamera
-import com.example.nhatpham.camerafilter.models.isFromGallery
+import com.example.nhatpham.camerafilter.models.*
 import com.example.nhatpham.camerafilter.utils.*
 import org.wysaid.myUtils.ImageUtil
 import java.io.File
+import java.lang.System.exit
 
 
 internal class PhotoReviewFragment : ViewLifecycleFragment(), View.OnClickListener {
@@ -54,8 +60,13 @@ internal class PhotoReviewFragment : ViewLifecycleFragment(), View.OnClickListen
     private val currentConfig
         get() = photoPreviewViewModel.currentConfigLiveData.value ?: NONE_CONFIG
 
+    private var enterTransitionEnd = true
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_photo_preview, container, false)
+        if(savedInstanceState == null) {
+            postponeEnterTransition()
+        }
         initUI()
         return mBinding.root
     }
@@ -81,29 +92,71 @@ internal class PhotoReviewFragment : ViewLifecycleFragment(), View.OnClickListen
         lifecycle.addObserver(mBinding.imageView)
         mBinding.imageView.displayMode = ImageGLSurfaceView.DisplayMode.DISPLAY_ASPECT_FILL
         mBinding.imageView.setSurfaceCreatedCallback {
-            mBinding.imageView.setImageBitmap(currentBitmap)
-            mBinding.imageView.setFilterWithConfig(photoPreviewViewModel.currentConfigLiveData.value?.value)
+            if(enterTransitionEnd) {
+                updateCurrentImage()
+            }
         }
-        mBinding.imageView.afterMeasured {
-            Glide.with(this)
-                    .asBitmap()
-                    .load(photo?.uri)
-                    .apply(RequestOptions.overrideOf(width, height))
-                    .listener(object : RequestListener<Bitmap> {
-                        override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Bitmap>?, isFirstResource: Boolean): Boolean {
-                            return false
-                        }
 
-                        override fun onResourceReady(resource: Bitmap?, model: Any?, target: Target<Bitmap>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
-                            currentBitmap = resource
-                            mBinding.imageView.post {
-                                mBinding.imageView.setFilterWithConfig(currentConfig.value)
-                            }
-                            mBinding.imageView.setImageBitmap(currentBitmap)
-                            return false
-                        }
-                    }).submit()
+        // Only apply shared element transition from gallery
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && photo?.isFromGallery() == true) {
+            enterTransitionEnd = false
+            mBinding.imageViewTemp.isVisible = true
+
+            val photoUri = photo?.uri
+            if (photoUri != null)
+                mBinding.imageViewTemp.transitionName = photoUri.lastPathSegment
         }
+        Glide.with(this)
+                .asBitmap()
+                .load(photo?.uri)
+                .apply(RequestOptions.centerInsideTransform())
+                .listener(object : RequestListener<Bitmap> {
+                    override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Bitmap>?, isFirstResource: Boolean): Boolean {
+                        startPostponedEnterTransition()
+                        return false
+                    }
+
+                    override fun onResourceReady(resource: Bitmap?, model: Any?, target: Target<Bitmap>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
+                        startPostponedEnterTransition()
+                        currentBitmap = resource
+
+                        // we're not applying shared element transition from camera, so update the image now
+                        if(photo?.isFromCamera() == true) {
+                            mBinding.imageViewTemp.isVisible = false
+                            updateCurrentImage()
+                        }
+                        return false
+                    }
+                }).into(mBinding.imageViewTemp)
+        prepareSharedElementTransition()
+    }
+
+    private fun prepareSharedElementTransition() {
+        val transition = TransitionInflater.from(context).inflateTransition(R.transition.image_shared_element_transition)
+        transition.duration = animShortDuration
+        transition.addListener(object : TransitionListenerAdapter() {
+            override fun onTransitionEnd(transition: Transition) {
+                transition.removeListener(this)
+                enterTransitionEnd = true
+
+                mBinding.imageViewTemp.postDelayed({
+                    mBinding.imageViewTemp.isInvisible = true
+                    updateCurrentImage()
+                }, animShortDuration)
+            }
+        })
+        sharedElementEnterTransition = transition
+
+        setEnterSharedElementCallback(object : SharedElementCallback() {
+            override fun onMapSharedElements(names: MutableList<String>?, sharedElements: MutableMap<String, View>?) {
+                sharedElements!![names!![0]] = mBinding.imageViewTemp
+            }
+        })
+    }
+
+    private fun updateCurrentImage() {
+        mBinding.imageView.setFilterWithConfig(currentConfig.value)
+        mBinding.imageView.setImageBitmap(currentBitmap)
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
@@ -207,7 +260,7 @@ internal class PhotoReviewFragment : ViewLifecycleFragment(), View.OnClickListen
 
     private fun exit() {
         activity?.run {
-            if(supportFragmentManager.backStackEntryCount == 0)
+            if (supportFragmentManager.backStackEntryCount == 0)
                 finish()
             else supportFragmentManager.popBackStack()
         }

@@ -4,6 +4,7 @@ import android.arch.lifecycle.Lifecycle
 import android.arch.lifecycle.LifecycleObserver
 import android.arch.lifecycle.OnLifecycleEvent
 import android.net.Uri
+import android.util.Log
 import android.view.Surface
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.SimpleExoPlayer
@@ -27,22 +28,29 @@ internal class VideoController(private val videoPlayer: VideoPlayer,
 
     private var currentUri: Uri? = null
     private val surfaceTextureCreated
-    get() = videoPlayerGLSurfaceView.surfaceTexture != null
+        get() = videoPlayerGLSurfaceView.surfaceTexture != null
 
     val isPlaying: Boolean
-    get() = videoPlayer.isPlaying
+        get() = videoPlayer.isPlaying
 
     val currentState: PlaybackState
-    get() = videoPlayer.currentState
+        get() = videoPlayer.currentState
 
     val currentPosition: Long
-    get() = videoPlayer.exoPlayer?.currentPosition ?: 0L
+        get() = videoPlayer.exoPlayer?.currentPosition ?: 0L
+
+    var shouldPlayWhenReady = true
+        set(value) {
+            field = value
+            if (field) {
+                currentUri?.let { videoPlayer.play(it) }
+            }
+        }
 
     private val playerListener = object : IPlayer.PlayerCallback {
 
         override fun onPlayerReady(exoPlayer: ExoPlayer) {
             if (exoPlayer is SimpleExoPlayer && videoPlayerGLSurfaceView.surfaceTexture != null) {
-                exoPlayer.removeVideoListener(videoListener)
                 exoPlayer.addVideoListener(videoListener)
                 exoPlayer.setVideoSurface(Surface(videoPlayerGLSurfaceView.surfaceTexture))
             }
@@ -70,14 +78,16 @@ internal class VideoController(private val videoPlayer: VideoPlayer,
 
     init {
         videoPlayerGLSurfaceView.setOnCreateCallback {
-            currentUri?.let { videoPlayer.play(it) }
+            if (shouldPlayWhenReady) {
+                currentUri?.let { videoPlayer.play(it) }
+            }
         }
         videoPlayer.addPlayerListener(playerListener)
     }
 
     fun play(uri: Uri) {
         currentUri = uri
-        if(surfaceTextureCreated)
+        if (surfaceTextureCreated)
             videoPlayer.play(uri)
     }
 

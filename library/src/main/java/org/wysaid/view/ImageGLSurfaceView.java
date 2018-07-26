@@ -69,7 +69,6 @@ public class ImageGLSurfaceView extends GLSurfaceView implements Renderer, Lifec
         GLES20.glDisable(GLES20.GL_STENCIL_TEST);
 
         mImageHandler = new CGEImageHandler();
-
         mImageHandler.setDrawerFlipScale(1.0f, -1.0f);
 
         if (mSurfaceCreatedCallback != null) {

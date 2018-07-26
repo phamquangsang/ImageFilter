@@ -1,23 +1,36 @@
 package com.example.nhatpham.camerafilter.gallery
 
 import android.databinding.DataBindingUtil
+import android.graphics.drawable.Drawable
+import android.os.Build
 import android.support.v7.widget.RecyclerView
 import android.text.format.DateUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import androidx.core.view.isVisible
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import com.example.nhatpham.camerafilter.R
 import com.example.nhatpham.camerafilter.databinding.LayoutGalleryItemBinding
 import java.util.concurrent.TimeUnit
+import com.bumptech.glide.RequestManager
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
+import java.util.concurrent.atomic.AtomicBoolean
+import com.bumptech.glide.request.target.Target
 
-internal class ThumbnailsAdapter(thumbnails: List<GalleryFragment.Thumbnail> = emptyList(),
-                                 private var onItemInteractListener: OnItemInteractListener?)
+
+internal class ThumbnailsAdapter(private val galleryFragment: GalleryFragment,
+                                 thumbnails: List<GalleryFragment.Thumbnail> = emptyList(),
+                                 private val onItemInteractListener: OnItemInteractListener?)
     : RecyclerView.Adapter<ThumbnailsAdapter.ViewHolder>() {
 
     private val thumbnails: MutableList<GalleryFragment.Thumbnail> = ArrayList()
+    private val requestManager: RequestManager = Glide.with(galleryFragment)
+    private val viewHolderListenerImpl = ViewHolderListenerImpl()
 
     init {
         this.thumbnails.addAll(thumbnails)
@@ -25,7 +38,7 @@ internal class ThumbnailsAdapter(thumbnails: List<GalleryFragment.Thumbnail> = e
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.layout_gallery_item, parent, false)
-        return ViewHolder(view)
+        return ViewHolder(view, viewHolderListenerImpl)
     }
 
     override fun getItemCount() = thumbnails.size
@@ -34,22 +47,40 @@ internal class ThumbnailsAdapter(thumbnails: List<GalleryFragment.Thumbnail> = e
         holder.bindData(thumbnails[position])
     }
 
-    inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    fun getItem(position: Int) = if(thumbnails.isEmpty() || position > itemCount) null else thumbnails[position]
+
+    inner class ViewHolder(itemView: View, val viewHolderListenerImpl: ViewHolderListenerImpl) : RecyclerView.ViewHolder(itemView) {
 
         private val mBinding = DataBindingUtil.bind<LayoutGalleryItemBinding>(itemView)
 
         init {
             mBinding!!.root.setOnClickListener {
-                onItemInteractListener?.onThumbnailSelected(thumbnails[adapterPosition])
+                onItemInteractListener?.onThumbnailSelected(mBinding.image, adapterPosition)
             }
         }
 
         fun bindData(thumbnail: GalleryFragment.Thumbnail) {
-            Glide.with(itemView.context)
+            requestManager
                     .load(thumbnail.uri)
+                    .apply(RequestOptions.frameOf(100000))
                     .apply(RequestOptions.encodeQualityOf(75))
                     .apply(RequestOptions.centerInsideTransform())
+                    .listener(object : RequestListener<Drawable> {
+                        override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>?, isFirstResource: Boolean): Boolean {
+                            viewHolderListenerImpl.onLoadCompleted(mBinding!!.image, adapterPosition)
+                            return false
+                        }
+
+                        override fun onResourceReady(resource: Drawable?, model: Any?, target: Target<Drawable>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
+                            viewHolderListenerImpl.onLoadCompleted(mBinding!!.image, adapterPosition)
+                            return false
+                        }
+                    })
                     .into(mBinding!!.image)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                mBinding.image.transitionName = thumbnail.id.toString()
+            }
 
             if(thumbnail.isVideo) {
                 mBinding.tvDuration.isVisible = true
@@ -69,8 +100,32 @@ internal class ThumbnailsAdapter(thumbnails: List<GalleryFragment.Thumbnail> = e
         }
     }
 
+    inner class ViewHolderListenerImpl: ViewHolderListener {
+
+        private val enterTransitionStarted: AtomicBoolean = AtomicBoolean()
+
+        override fun onLoadCompleted(view: ImageView, position: Int) {
+            if(position != galleryFragment.lastSelectedItemPos) {
+                return
+            }
+
+            if (enterTransitionStarted.getAndSet(true)) {
+                return
+            }
+            galleryFragment.startPostponedEnterTransition()
+        }
+    }
+
     interface OnItemInteractListener {
 
-        fun onThumbnailSelected(thumbnail: GalleryFragment.Thumbnail)
+        fun onThumbnailSelected(view: View, position: Int)
+    }
+
+    /**
+     * A listener that is attached to all ViewHolders to handle image loading events and clicks.
+     */
+    private interface ViewHolderListener {
+
+        fun onLoadCompleted(view: ImageView, adapterPosition: Int)
     }
 }

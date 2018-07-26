@@ -2,6 +2,7 @@ package com.example.nhatpham.camerafilter
 
 import android.Manifest
 import android.app.Activity
+import android.app.Application
 import android.arch.lifecycle.Observer
 import android.content.Context
 import android.content.Intent
@@ -11,9 +12,14 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
+import android.support.v4.app.Fragment
 import android.util.Log
 import android.view.Window
 import android.view.WindowManager
+import android.webkit.MimeTypeMap
+import android.webkit.URLUtil
+import com.bumptech.glide.Glide
+import com.bumptech.glide.request.RequestOptions
 import com.example.nhatpham.camerafilter.camera.CameraFragment
 import com.example.nhatpham.camerafilter.gallery.GalleryFragment
 import com.example.nhatpham.camerafilter.models.Config
@@ -25,16 +31,21 @@ import com.example.nhatpham.camerafilter.preview.VideoReviewFragment
 import com.example.nhatpham.camerafilter.utils.*
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import org.jetbrains.anko.doAsync
 import org.jetbrains.anko.intentFor
+import org.jetbrains.anko.uiThread
 import org.wysaid.common.Common
 import org.wysaid.nativePort.CGENativeLibrary
 import java.io.*
+import java.lang.Exception
+import java.net.URL
 import kotlin.math.absoluteValue
 
 class MainCameraActivity : AppCompatActivity() {
 
     private lateinit var mainViewModel: MainViewModel
-    private val cameraFragment by lazy { CameraFragment() }
+    private val currentFragment : Fragment
+    get() = supportFragmentManager.findFragmentById(R.id.fragment_container)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -138,7 +149,7 @@ class MainCameraActivity : AppCompatActivity() {
 
     private fun showCameraFragment() {
         supportFragmentManager.beginTransaction()
-                .add(R.id.fragment_container, cameraFragment)
+                .add(R.id.fragment_container, CameraFragment())
                 .commitAllowingStateLoss()
     }
 
@@ -146,21 +157,21 @@ class MainCameraActivity : AppCompatActivity() {
         supportFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, PhotoReviewFragment.newInstance(photo))
                 .also { if (shouldAddToBackStack) it.addToBackStack(null) }
-                .commit()
+                .commitAllowingStateLoss()
     }
 
     private fun showVideoReviewFragment(video: Video, shouldAddToBackStack: Boolean = true) {
         supportFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, VideoReviewFragment.newInstance(video))
                 .also { if (shouldAddToBackStack) it.addToBackStack(null) }
-                .commit()
+                .commitAllowingStateLoss()
     }
 
     private fun showGalleryFragment() {
         supportFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, GalleryFragment())
                 .addToBackStack(null)
-                .commit()
+                .commitAllowingStateLoss()
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {

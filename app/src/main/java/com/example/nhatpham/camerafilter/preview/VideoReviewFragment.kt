@@ -5,7 +5,9 @@ import android.animation.AnimatorListenerAdapter
 import android.arch.lifecycle.LiveData
 import android.arch.lifecycle.Observer
 import android.databinding.DataBindingUtil
+import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.support.v7.widget.LinearLayoutManager
 import android.util.Log
@@ -18,12 +20,23 @@ import com.example.nhatpham.camerafilter.databinding.FragmentVideoPreviewBinding
 import org.wysaid.common.Common
 import android.os.Handler
 import android.os.SystemClock
+import android.support.transition.Transition
+import android.support.transition.TransitionInflater
+import android.support.transition.TransitionListenerAdapter
+import android.support.v4.app.SharedElementCallback
 import android.text.format.DateUtils
 import androidx.core.os.bundleOf
+import androidx.core.view.isInvisible
 import androidx.work.OneTimeWorkRequest
 import androidx.work.State
 import androidx.work.WorkManager
 import androidx.work.WorkStatus
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.RequestOptions
+import com.bumptech.glide.request.target.Target
 import com.example.nhatpham.camerafilter.*
 import com.example.nhatpham.camerafilter.jobs.GenerateFilteredVideoWorker
 import com.example.nhatpham.camerafilter.models.Config
@@ -110,6 +123,9 @@ internal class VideoReviewFragment : ViewLifecycleFragment(), View.OnClickListen
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_video_preview, container, false)
+        if(savedInstanceState == null) {
+            postponeEnterTransition()
+        }
         initUI()
         return mBinding.root
     }
@@ -134,6 +150,34 @@ internal class VideoReviewFragment : ViewLifecycleFragment(), View.OnClickListen
             setZOrderOnTop(false)
             setFitFullView(true)
         }
+        videoController = VideoController(VideoPlayer(context!!), mBinding.videoView)
+        videoController.addPlayerListener(playerListener)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && video?.isFromGallery() == true) {
+            videoController.shouldPlayWhenReady = false
+            mBinding.imageViewTemp.isVisible = true
+
+            val videoUri = video?.uri
+            if (videoUri != null)
+                mBinding.imageViewTemp.transitionName = videoUri.lastPathSegment
+        }
+        Glide.with(this)
+                .asBitmap()
+                .load(video?.uri)
+                .apply(RequestOptions.frameOf(100000))
+                .apply(RequestOptions.centerInsideTransform())
+                .listener(object : RequestListener<Bitmap> {
+                    override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Bitmap>?, isFirstResource: Boolean): Boolean {
+                        startPostponedEnterTransition()
+                        return false
+                    }
+
+                    override fun onResourceReady(resource: Bitmap?, model: Any?, target: Target<Bitmap>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
+                        startPostponedEnterTransition()
+                        return false
+                    }
+                }).into(mBinding.imageViewTemp)
+        prepareSharedElementTransition()
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
@@ -152,11 +196,30 @@ internal class VideoReviewFragment : ViewLifecycleFragment(), View.OnClickListen
                 previewFiltersAdapter.setNewConfig(newConfig)
             }
         })
-
-        videoController = VideoController(VideoPlayer(context!!), mBinding.videoView)
-        videoController.addPlayerListener(playerListener)
         video?.uri?.let { videoController.play(it) }
         lifecycle.addObserver(videoController)
+    }
+
+    private fun prepareSharedElementTransition() {
+        val transition = TransitionInflater.from(context).inflateTransition(R.transition.image_shared_element_transition)
+        transition.duration = animShortDuration
+        transition.addListener(object : TransitionListenerAdapter() {
+            override fun onTransitionEnd(transition: Transition) {
+                transition.removeListener(this)
+
+                videoController.shouldPlayWhenReady = true
+                mBinding.imageViewTemp.postDelayed({
+                    mBinding.imageViewTemp.isInvisible = true
+                }, animShortDuration)
+            }
+        })
+        sharedElementEnterTransition = transition
+
+        setEnterSharedElementCallback(object : SharedElementCallback() {
+            override fun onMapSharedElements(names: MutableList<String>?, sharedElements: MutableMap<String, View>?) {
+                sharedElements!![names!![0]] = mBinding.imageViewTemp
+            }
+        })
     }
 
     private fun scheduleRecordTime() {
