@@ -11,26 +11,35 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.core.view.isVisible
 import com.bumptech.glide.Glide
+import com.bumptech.glide.RequestManager
 import com.bumptech.glide.request.RequestOptions
 import com.example.nhatpham.camerafilter.R
 import com.example.nhatpham.camerafilter.databinding.LayoutGalleryItemBinding
 import java.util.concurrent.TimeUnit
-import com.bumptech.glide.RequestManager
 import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.request.RequestListener
 import java.util.concurrent.atomic.AtomicBoolean
 import com.bumptech.glide.request.target.Target
+import com.example.nhatpham.camerafilter.models.Thumbnail
+import com.example.nhatpham.camerafilter.utils.IDebounce
+import com.example.nhatpham.camerafilter.utils.debounce
 
 
 internal class ThumbnailsAdapter(private val galleryFragment: GalleryFragment,
-                                 thumbnails: List<GalleryFragment.Thumbnail> = emptyList(),
+                                 thumbnails: List<Thumbnail> = emptyList(),
                                  private val onItemInteractListener: OnItemInteractListener?)
     : RecyclerView.Adapter<ThumbnailsAdapter.ViewHolder>() {
 
-    private val thumbnails: MutableList<GalleryFragment.Thumbnail> = ArrayList()
+    private val thumbnails: MutableList<Thumbnail> = ArrayList()
     private val requestManager: RequestManager = Glide.with(galleryFragment)
     private val viewHolderListenerImpl = ViewHolderListenerImpl()
+    private val requestOptions = RequestOptions().apply {
+        diskCacheStrategy(DiskCacheStrategy.ALL)
+        frame(100000)
+        centerInside()
+    }
 
     init {
         this.thumbnails.addAll(thumbnails)
@@ -55,16 +64,16 @@ internal class ThumbnailsAdapter(private val galleryFragment: GalleryFragment,
 
         init {
             mBinding!!.root.setOnClickListener {
-                onItemInteractListener?.onThumbnailSelected(mBinding.image, adapterPosition)
+                onItemInteractListener?.debounce {
+                    onThumbnailSelected(mBinding.image, adapterPosition)
+                }
             }
         }
 
-        fun bindData(thumbnail: GalleryFragment.Thumbnail) {
+        fun bindData(thumbnail: Thumbnail) {
             requestManager
                     .load(thumbnail.uri)
-                    .apply(RequestOptions.frameOf(100000))
-                    .apply(RequestOptions.encodeQualityOf(75))
-                    .apply(RequestOptions.centerInsideTransform())
+                    .apply(requestOptions)
                     .listener(object : RequestListener<Drawable> {
                         override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>?, isFirstResource: Boolean): Boolean {
                             viewHolderListenerImpl.onLoadCompleted(mBinding!!.image, adapterPosition)
@@ -93,7 +102,7 @@ internal class ThumbnailsAdapter(private val galleryFragment: GalleryFragment,
         }
     }
 
-    fun setThumbnails(thumbnails: List<GalleryFragment.Thumbnail>) {
+    fun setThumbnails(thumbnails: List<Thumbnail>) {
         this.thumbnails.apply {
             clear()
             addAll(thumbnails)
@@ -116,7 +125,7 @@ internal class ThumbnailsAdapter(private val galleryFragment: GalleryFragment,
         }
     }
 
-    interface OnItemInteractListener {
+    interface OnItemInteractListener : IDebounce {
 
         fun onThumbnailSelected(view: View, position: Int)
     }

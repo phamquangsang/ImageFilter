@@ -11,15 +11,19 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.os.bundleOf
 import com.bumptech.glide.Glide
+import com.bumptech.glide.RequestManager
 import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool
 import com.bumptech.glide.load.resource.bitmap.BitmapTransformation
 import com.bumptech.glide.request.RequestOptions
 import com.example.nhatpham.camerafilter.databinding.LayoutPreviewItemBinding
 import com.example.nhatpham.camerafilter.models.Config
+import com.example.nhatpham.camerafilter.utils.clickWithDebounce
 import com.example.nhatpham.camerafilter.utils.convertDpToPixel
 
 import org.wysaid.nativePort.CGENativeLibrary
 import java.security.MessageDigest
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 
 internal class PreviewFiltersAdapter(context: Context,
                                      private val configs: List<Config> = emptyList(),
@@ -30,6 +34,7 @@ internal class PreviewFiltersAdapter(context: Context,
     private val selectedColor = Color.parseColor("#FF7A79")
     private val defaultScale = 1F
     private val selectedScale = 1.05F
+    private val threadPool = Executors.newFixedThreadPool(2)
 
     var imageUri: String? = null
     private var lastSelectedPosition = 0
@@ -76,7 +81,7 @@ internal class PreviewFiltersAdapter(context: Context,
         val mBinding: LayoutPreviewItemBinding? = DataBindingUtil.bind(itemView)
 
         init {
-            itemView.setOnClickListener {
+            itemView.clickWithDebounce {
                 val bundle = bundleOf("selected" to true)
                 notifyItemChanged(lastSelectedPosition, bundle)
                 lastSelectedPosition = adapterPosition
@@ -92,14 +97,20 @@ internal class PreviewFiltersAdapter(context: Context,
                         .load(imageUri)
                         .apply(RequestOptions.encodeQualityOf(75))
                         .apply(RequestOptions.overrideOf(previewSize))
-                        .apply(RequestOptions.centerInsideTransform())
                         .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
                             override fun updateDiskCacheKey(messageDigest: MessageDigest) {
                                 messageDigest.update(config.name.toByteArray())
                             }
 
-                            override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int): Bitmap {
-                                return CGENativeLibrary.filterImage_MultipleEffects(toTransform, config.value, 1.0f)
+                            override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int): Bitmap? {
+                                var bitmap: Bitmap? = null
+                                val countDownLatch = CountDownLatch(1)
+                                threadPool.submit {
+                                    bitmap = CGENativeLibrary.filterImage_MultipleEffects(toTransform, config.value, 1.0f)
+                                    countDownLatch.countDown()
+                                }
+                                countDownLatch.await()
+                                return bitmap
                             }
 
                         }))
@@ -110,16 +121,14 @@ internal class PreviewFiltersAdapter(context: Context,
                         .load(R.drawable.default_filter)
                         .apply(RequestOptions.encodeQualityOf(75))
                         .apply(RequestOptions.overrideOf(previewSize))
-                        .apply(RequestOptions.centerInsideTransform())
                         .apply(RequestOptions.bitmapTransform(object : BitmapTransformation() {
                             override fun updateDiskCacheKey(messageDigest: MessageDigest) {
                                 messageDigest.update(config.name.toByteArray())
                             }
 
-                            override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int): Bitmap {
-                                return CGENativeLibrary.filterImage_MultipleEffects(toTransform, config.value, 1.0f)
+                            override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int): Bitmap? {
+                                return generateFilteredBitmap(toTransform, config.value)
                             }
-
                         }))
                         .into(mBinding!!.imgFilter)
             }
@@ -145,6 +154,17 @@ internal class PreviewFiltersAdapter(context: Context,
                 }
                 mBinding.imgFilter.borderColor = if (lastSelectedPosition == adapterPosition) selectedColor else Color.WHITE
             }
+        }
+
+        fun generateFilteredBitmap(toTransform: Bitmap, config: String) : Bitmap? {
+            var bitmap: Bitmap? = null
+            val countDownLatch = CountDownLatch(1)
+            threadPool.submit {
+                bitmap = CGENativeLibrary.filterImage_MultipleEffects(toTransform, config, 1.0f)
+                countDownLatch.countDown()
+            }
+            countDownLatch.await()
+            return bitmap
         }
     }
 

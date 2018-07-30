@@ -91,12 +91,12 @@ internal class CameraFragment : ViewLifecycleFragment(), View.OnClickListener {
             }
         })
 
-        mBinding.btnRecord.setOnClickListener(RecordListener())
-        mBinding.btnTakePhoto.setOnClickListener(this)
-        mBinding.btnPickFilters.setOnClickListener(this)
-        mBinding.btnGallery.setOnClickListener(this)
-        mBinding.btnBack.setOnClickListener(this)
-        mBinding.btnSwitch.setOnClickListener(this)
+        mBinding.btnRecord.clickWithDebounce(listener = RecordListener())
+        mBinding.btnTakePhoto.clickWithDebounce(listener = this)
+        mBinding.btnPickFilters.clickWithDebounce(300, listener = this)
+        mBinding.btnGallery.clickWithDebounce(listener = this)
+        mBinding.btnBack.clickWithDebounce(listener = this)
+        mBinding.btnSwitch.clickWithDebounce(listener = this)
 
         lifecycle.addObserver(mBinding.cameraView)
         mBinding.cameraView.setOnCreateCallback {

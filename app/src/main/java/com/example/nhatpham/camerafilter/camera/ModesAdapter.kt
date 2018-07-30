@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import com.example.nhatpham.camerafilter.R
 import com.example.nhatpham.camerafilter.databinding.LayoutModeItemBinding
+import com.example.nhatpham.camerafilter.utils.clickWithDebounce
 
 internal class ModesAdapter(private val modes: List<CameraMode> = ArrayList(),
                             private val onItemInteractListener: OnItemInteractListener?)
@@ -30,7 +31,7 @@ internal class ModesAdapter(private val modes: List<CameraMode> = ArrayList(),
         private val mBinding: LayoutModeItemBinding? = DataBindingUtil.bind(itemView)
 
         init {
-            mBinding!!.tvMode.setOnClickListener {
+            mBinding!!.tvMode.clickWithDebounce {
                 onItemInteractListener?.onModeSelected(modes[adapterPosition], adapterPosition)
             }
         }

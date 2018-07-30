@@ -97,13 +97,13 @@ public class ImageGLSurfaceView extends GLSurfaceView implements Renderer, Lifec
         mImageHandler.drawResult();
     }
 
-    @OnLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+    @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
     @Override
     public void onPause() {
         super.onPause();
     }
 
-    @OnLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+    @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
     public void release() {
         if (mImageHandler != null) {
             queueEvent(new Runnable() {
@@ -120,7 +120,7 @@ public class ImageGLSurfaceView extends GLSurfaceView implements Renderer, Lifec
         }
     }
 
-    @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)
+    @OnLifecycleEvent(Lifecycle.Event.ON_START)
     @Override
     public void onResume() {
         super.onResume();

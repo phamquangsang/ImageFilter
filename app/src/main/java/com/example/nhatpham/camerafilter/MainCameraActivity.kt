@@ -12,6 +12,8 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.support.v4.app.Fragment
 import android.util.Log
 import android.view.Window
@@ -44,14 +46,13 @@ import kotlin.math.absoluteValue
 class MainCameraActivity : AppCompatActivity() {
 
     private lateinit var mainViewModel: MainViewModel
-    private val currentFragment : Fragment
-    get() = supportFragmentManager.findFragmentById(R.id.fragment_container)
+    private val currentFragment: Fragment
+        get() = supportFragmentManager.findFragmentById(R.id.fragment_container)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestWindowFeature(Window.FEATURE_NO_TITLE)
-        window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
-                WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
         setContentView(R.layout.activity_preview)
 
         CGENativeLibrary.setLoadImageCallback(object : CGENativeLibrary.LoadImageCallback {
@@ -185,6 +186,22 @@ class MainCameraActivity : AppCompatActivity() {
                 }
             }
             else -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        }
+    }
+
+    override fun onBackPressed() {
+        var dispatchToBase = true
+        currentFragment.let {
+            if (it is PhotoReviewFragment) {
+                dispatchToBase = it.onBackPressed()
+            } else if (it is VideoReviewFragment) {
+                dispatchToBase = it.onBackPressed()
+            }
+        }
+        if(dispatchToBase) {
+            Handler(Looper.getMainLooper()).post {
+                super.onBackPressed()
+            }
         }
     }
 

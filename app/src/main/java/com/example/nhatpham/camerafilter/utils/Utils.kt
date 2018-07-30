@@ -91,7 +91,7 @@ internal fun getPath(): String {
 }
 
 internal fun getInternalPath(context: Context): String {
-    val file = context.getDir("$STORAGE_DIR_NAME-camera", Context.MODE_PRIVATE)
+    val file = context.getDir("camera-filter", Context.MODE_PRIVATE)
     return file.apply {
         if(!exists()) {
             mkdirs()

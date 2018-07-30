@@ -2,7 +2,6 @@ package com.example.nhatpham.camerafilter.gallery
 
 import android.content.ContentUris
 import android.databinding.DataBindingUtil
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.support.v4.app.Fragment
@@ -26,7 +25,8 @@ import org.jetbrains.anko.doAsync
 import org.jetbrains.anko.uiThread
 import kotlin.Comparator
 import kotlin.collections.ArrayList
-import android.view.View.OnLayoutChangeListener
+import com.example.nhatpham.camerafilter.models.Thumbnail
+import com.example.nhatpham.camerafilter.utils.clickWithDebounce
 
 
 internal class GalleryFragment : Fragment() {
@@ -50,6 +50,8 @@ internal class GalleryFragment : Fragment() {
         mBinding.rcImages.addItemDecoration(SpacesItemDecoration(resources.getDimensionPixelSize(R.dimen.gallery_space_item_size)))
 
         thumbnailsAdapter = ThumbnailsAdapter(this, ArrayList(), object : ThumbnailsAdapter.OnItemInteractListener {
+            override var lastClickTime: Long = 0
+
             override fun onThumbnailSelected(view: View, position: Int) {
                 thumbnailsAdapter.getItem(position)?.let { thumbnail ->
                     lastSelectedItemPosInternal = position
@@ -65,7 +67,7 @@ internal class GalleryFragment : Fragment() {
         })
         mBinding.rcImages.adapter = thumbnailsAdapter
 
-        mBinding.btnBack.setOnClickListener {
+        mBinding.btnBack.clickWithDebounce {
             activity?.supportFragmentManager?.popBackStack()
         }
 
@@ -77,6 +79,7 @@ internal class GalleryFragment : Fragment() {
         val animShortDuration = resources.getInteger(android.R.integer.config_shortAnimTime).toLong()
         val inflatedExitTransition = TransitionInflater.from(context).inflateTransition(R.transition.grid_exit_fade_transition)
         inflatedExitTransition.duration = animShortDuration
+        inflatedExitTransition.excludeTarget(mBinding.layoutBar, true)
         exitTransition = inflatedExitTransition
 
         setExitSharedElementCallback(object : SharedElementCallback() {
@@ -111,40 +114,9 @@ internal class GalleryFragment : Fragment() {
                 if (adapter is ThumbnailsAdapter) {
                     adapter.setThumbnails(thumbnails)
                     adapter.notifyDataSetChanged()
-                    scrollToPosition()
                 }
             }
         }
-    }
-
-    /**
-     * Scrolls the recycler view to show the last viewed item in the grid. This is important when
-     * navigating back from the grid.
-     */
-    private fun scrollToPosition() {
-        mBinding.rcImages.addOnLayoutChangeListener(object : OnLayoutChangeListener {
-            override fun onLayoutChange(v: View,
-                                        left: Int,
-                                        top: Int,
-                                        right: Int,
-                                        bottom: Int,
-                                        oldLeft: Int,
-                                        oldTop: Int,
-                                        oldRight: Int,
-                                        oldBottom: Int) {
-                mBinding.rcImages.removeOnLayoutChangeListener(this)
-                val layoutManager = mBinding.rcImages.layoutManager
-                val viewAtPosition = layoutManager.findViewByPosition(lastSelectedItemPosInternal)
-                // Scroll to position if the view for the current position is null (not currently part of
-                // layout manager children), or it's not completely visible.
-                if (viewAtPosition == null || layoutManager.isViewPartiallyVisible(viewAtPosition,
-                                false, true)) {
-                    mBinding.rcImages.post {
-                        layoutManager.scrollToPosition(lastSelectedItemPosInternal)
-                    }
-                }
-            }
-        })
     }
 
     private fun getImageThumbnails(): ArrayList<Thumbnail> {
@@ -167,22 +139,6 @@ internal class GalleryFragment : Fragment() {
         return result
     }
 
-    private fun getOriginImageUri(id: Int): Uri? {
-        val projection = arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.DATA)
-        val selection = "${MediaStore.Images.Media._ID} = ?"
-        val cursor = context!!.contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                projection,
-                selection,
-                arrayOf("$id"),
-                null)
-        if (cursor.moveToFirst()) {
-            return ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)))
-        }
-        cursor.close()
-        return null
-    }
-
     private fun getVideoThumbnails(): ArrayList<Thumbnail> {
         val projection = arrayOf(MediaStore.Video.Media._ID,
                 MediaStore.Video.Media.DATA, MediaStore.Video.Media.DURATION)
@@ -202,22 +158,6 @@ internal class GalleryFragment : Fragment() {
         }
         cursor.close()
         return result
-    }
-
-    private fun getOriginVideoUri(id: Int): Uri? {
-        val projection = arrayOf(MediaStore.Video.Media._ID, MediaStore.Video.Media.DATA)
-        val selection = "${MediaStore.Video.Media._ID} = ?"
-        val cursor = context!!.contentResolver.query(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                projection,
-                selection,
-                arrayOf("$id"),
-                null)
-        if (cursor.moveToFirst()) {
-            return ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                    cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)))
-        }
-        cursor.close()
-        return null
     }
 
     private fun showPhotoReviewFragment(photo: Photo, sharedView: View) {
@@ -257,9 +197,4 @@ internal class GalleryFragment : Fragment() {
                     .commit()
         }
     }
-
-    data class Thumbnail(val id: Long,
-                         val uri: String,
-                         val isVideo: Boolean = false,
-                         val duration: Long = 0)
 }

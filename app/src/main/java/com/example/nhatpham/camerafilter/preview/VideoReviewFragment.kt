@@ -20,6 +20,7 @@ import com.example.nhatpham.camerafilter.databinding.FragmentVideoPreviewBinding
 import org.wysaid.common.Common
 import android.os.Handler
 import android.os.SystemClock
+import android.provider.MediaStore
 import android.support.transition.Transition
 import android.support.transition.TransitionInflater
 import android.support.transition.TransitionListenerAdapter
@@ -76,6 +77,7 @@ internal class VideoReviewFragment : ViewLifecycleFragment(), View.OnClickListen
     }
     private var lastIntervalUpdate = 0L
     private var isCompleted = true
+    private var enterTransitionEnd = true
 
     private lateinit var videoController: VideoController
 
@@ -123,7 +125,7 @@ internal class VideoReviewFragment : ViewLifecycleFragment(), View.OnClickListen
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_video_preview, container, false)
-        if(savedInstanceState == null) {
+        if (savedInstanceState == null) {
             postponeEnterTransition()
         }
         initUI()
@@ -141,11 +143,11 @@ internal class VideoReviewFragment : ViewLifecycleFragment(), View.OnClickListen
         val pos = previewFiltersAdapter.findConfigPos(video?.config ?: NONE_CONFIG)
         mBinding.rcImgPreview.scrollToPosition(pos ?: 0)
 
-        mBinding.btnPickStickers.setOnClickListener(this)
-        mBinding.btnPickFilters.setOnClickListener(this)
-        mBinding.btnDone.setOnClickListener(this)
-        mBinding.btnBack.setOnClickListener(this)
-        mBinding.videoView.setOnClickListener(this)
+        mBinding.btnPickStickers.clickWithDebounce(300, listener = this)
+        mBinding.btnPickFilters.clickWithDebounce(300, listener = this)
+        mBinding.btnDone.clickWithDebounce(listener = this)
+        mBinding.btnBack.clickWithDebounce(listener = this)
+        mBinding.videoView.clickWithDebounce(listener = this)
         mBinding.videoView.apply {
             setZOrderOnTop(false)
             setFitFullView(true)
@@ -154,6 +156,7 @@ internal class VideoReviewFragment : ViewLifecycleFragment(), View.OnClickListen
         videoController.addPlayerListener(playerListener)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && video?.isFromGallery() == true) {
+            enterTransitionEnd = false
             videoController.shouldPlayWhenReady = false
             mBinding.imageViewTemp.isVisible = true
 
@@ -200,16 +203,22 @@ internal class VideoReviewFragment : ViewLifecycleFragment(), View.OnClickListen
         lifecycle.addObserver(videoController)
     }
 
+    fun onBackPressed(): Boolean {
+        if (enterTransitionEnd) mBinding.imageViewTemp.isVisible = true
+        return enterTransitionEnd
+    }
+
     private fun prepareSharedElementTransition() {
         val transition = TransitionInflater.from(context).inflateTransition(R.transition.image_shared_element_transition)
         transition.duration = animShortDuration
         transition.addListener(object : TransitionListenerAdapter() {
             override fun onTransitionEnd(transition: Transition) {
                 transition.removeListener(this)
+                enterTransitionEnd = true
 
                 videoController.shouldPlayWhenReady = true
                 mBinding.imageViewTemp.postDelayed({
-                    mBinding.imageViewTemp.isInvisible = true
+                    mBinding.imageViewTemp.isVisible = false
                 }, animShortDuration)
             }
         })
@@ -357,7 +366,7 @@ internal class VideoReviewFragment : ViewLifecycleFragment(), View.OnClickListen
 
     private fun exit() {
         activity?.run {
-            if(supportFragmentManager.backStackEntryCount == 0)
+            if (supportFragmentManager.backStackEntryCount == 0)
                 finish()
             else supportFragmentManager.popBackStack()
         }
@@ -373,7 +382,7 @@ internal class VideoReviewFragment : ViewLifecycleFragment(), View.OnClickListen
                 when {
                     isMediaStoreImageUri(currentVideo.uri) -> {
                         val path = getPathFromMediaUri(context!!, currentVideo.uri)
-                        if(!path.isNullOrEmpty()) {
+                        if (!path.isNullOrEmpty()) {
                             mainViewModel.doneEditEvent.value = Uri.fromFile(File(path))
                         } else {
                             mainViewModel.doneEditEvent.value = null
