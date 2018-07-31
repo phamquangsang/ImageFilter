@@ -20,14 +20,12 @@ import com.example.nhatpham.camerafilter.databinding.FragmentVideoPreviewBinding
 import org.wysaid.common.Common
 import android.os.Handler
 import android.os.SystemClock
-import android.provider.MediaStore
 import android.support.transition.Transition
 import android.support.transition.TransitionInflater
 import android.support.transition.TransitionListenerAdapter
 import android.support.v4.app.SharedElementCallback
 import android.text.format.DateUtils
 import androidx.core.os.bundleOf
-import androidx.core.view.isInvisible
 import androidx.work.OneTimeWorkRequest
 import androidx.work.State
 import androidx.work.WorkManager
@@ -39,6 +37,7 @@ import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.Target
 import com.example.nhatpham.camerafilter.*
+import com.example.nhatpham.camerafilter.custom.ViewLifecycleFragment
 import com.example.nhatpham.camerafilter.jobs.GenerateFilteredVideoWorker
 import com.example.nhatpham.camerafilter.models.Config
 import com.example.nhatpham.camerafilter.models.Video

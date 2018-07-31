@@ -14,6 +14,7 @@ import android.support.transition.TransitionSet
 import android.support.v4.app.SharedElementCallback
 import android.support.v7.widget.GridLayoutManager
 import com.example.nhatpham.camerafilter.*
+import com.example.nhatpham.camerafilter.custom.SpacesItemDecoration
 import com.example.nhatpham.camerafilter.databinding.FragmentGalleryBinding
 import com.example.nhatpham.camerafilter.models.Photo
 import com.example.nhatpham.camerafilter.models.Source

@@ -24,6 +24,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.support.v4.app.Fragment
 import android.support.v4.app.FragmentActivity
+import android.util.TypedValue
 import android.view.View
 import android.view.ViewTreeObserver
 import com.example.nhatpham.camerafilter.STORAGE_DIR_NAME
@@ -53,6 +54,10 @@ internal fun convertDpToPixel(context: Context, dp: Float): Int {
 internal fun convertPixelsToDp(context: Context, px: Float): Int {
     val displayMetrics = context.resources.displayMetrics
     return Math.round(px / (displayMetrics.densityDpi / DisplayMetrics.DENSITY_DEFAULT.toFloat()))
+}
+
+internal fun convertSpToPixels(context: Context, sp : Float) : Int {
+    return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, context.resources.displayMetrics).toInt()
 }
 
 internal fun getThumbnail(context: Context, videoUri: Uri): Bitmap? {

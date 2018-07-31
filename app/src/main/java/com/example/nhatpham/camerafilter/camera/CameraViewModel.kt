@@ -5,7 +5,7 @@ import android.arch.lifecycle.ViewModel
 import android.databinding.ObservableBoolean
 import com.example.nhatpham.camerafilter.NONE_CONFIG
 import com.example.nhatpham.camerafilter.models.Config
-import com.example.nhatpham.camerafilter.SingleLiveEvent
+import com.example.nhatpham.camerafilter.custom.SingleLiveEvent
 
 internal class CameraViewModel : ViewModel() {
 

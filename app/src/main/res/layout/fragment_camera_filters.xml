@@ -10,8 +10,10 @@
             type="com.example.nhatpham.camerafilter.camera.CameraViewModel" />
 
         <import type="android.view.View" />
-        <import type="com.example.nhatpham.camerafilter.AppConfigKt"/>
-        <import type="com.example.nhatpham.camerafilter.PreviewType"/>
+
+        <import type="com.example.nhatpham.camerafilter.AppConfigKt" />
+
+        <import type="com.example.nhatpham.camerafilter.PreviewType" />
     </data>
 
     <android.support.constraint.ConstraintLayout

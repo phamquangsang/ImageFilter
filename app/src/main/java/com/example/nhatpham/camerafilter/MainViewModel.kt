@@ -6,14 +6,13 @@ import android.net.Uri
 import android.webkit.MimeTypeMap
 import android.webkit.URLUtil
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.request.RequestOptions
+import com.example.nhatpham.camerafilter.custom.SingleLiveEvent
 import com.example.nhatpham.camerafilter.models.Photo
 import com.example.nhatpham.camerafilter.models.Source
 import com.example.nhatpham.camerafilter.models.Video
 import com.example.nhatpham.camerafilter.utils.*
 import org.jetbrains.anko.doAsync
-import org.jetbrains.anko.uiThread
 import java.lang.Exception
 import java.net.URL
 

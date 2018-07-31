@@ -21,6 +21,8 @@ import android.widget.Toast
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import com.example.nhatpham.camerafilter.*
+import com.example.nhatpham.camerafilter.custom.ScaledCenterLayoutManager
+import com.example.nhatpham.camerafilter.custom.ViewLifecycleFragment
 import com.example.nhatpham.camerafilter.databinding.FragmentCameraFiltersBinding
 import com.example.nhatpham.camerafilter.models.*
 import com.example.nhatpham.camerafilter.utils.*
@@ -48,6 +50,10 @@ internal class CameraFragment : ViewLifecycleFragment(), View.OnClickListener {
     private val animShortDuration by lazy {
         resources.getInteger(android.R.integer.config_shortAnimTime).toLong()
     }
+    private val modes = ArrayList<CameraMode>().apply {
+        add(CameraMode.Photo)
+        add(CameraMode.Video)
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_camera_filters, container, false)
@@ -62,6 +68,7 @@ internal class CameraFragment : ViewLifecycleFragment(), View.OnClickListener {
                 cameraViewModel.currentConfigLiveData.value = selectedConfig
             }
         })
+
         previewFiltersAdapter.imageUri = ""
         mBinding.rcImgPreview.adapter = previewFiltersAdapter
 
@@ -74,19 +81,30 @@ internal class CameraFragment : ViewLifecycleFragment(), View.OnClickListener {
             }
         })
         mBinding.rcModes.adapter = modesAdapter
+        mBinding.rcModes.smoothScrollToPosition(0)
         mBinding.rcModes.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            private var scrolled = false
+
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                 super.onScrollStateChanged(recyclerView, newState)
-                if (newState != RecyclerView.SCROLL_STATE_IDLE)
-                    return
-                val layoutManager = recyclerView.layoutManager
-                if (layoutManager is LinearLayoutManager) {
-                    val snapView = snapHelper.findSnapView(layoutManager)
-                    if (snapView != null) {
-                        val pos = layoutManager.getPosition(snapView)
-                        if (pos != RecyclerView.NO_POSITION)
-                            cameraViewModel.currentModeLiveData.value = modesAdapter.getItem(pos)
+                if (newState == RecyclerView.SCROLL_STATE_IDLE && scrolled) {
+                    scrolled = false
+                    val layoutManager = recyclerView.layoutManager
+                    if (layoutManager is LinearLayoutManager) {
+                        val snapView = snapHelper.findSnapView(layoutManager)
+                        if (snapView != null) {
+                            val pos = layoutManager.getPosition(snapView)
+                            if (pos != RecyclerView.NO_POSITION)
+                                cameraViewModel.currentModeLiveData.value = modesAdapter.getItem(pos)
+                        }
                     }
+                }
+            }
+
+            override fun onScrolled(recyclerView: RecyclerView?, dx: Int, dy: Int) {
+                super.onScrolled(recyclerView, dx, dy)
+                if (dx != 0 || dy != 0) {
+                    scrolled = true
                 }
             }
         })

@@ -1,4 +1,4 @@
-package com.example.nhatpham.camerafilter
+package com.example.nhatpham.camerafilter.custom
 
 import android.graphics.Rect
 import android.support.v7.widget.GridLayoutManager

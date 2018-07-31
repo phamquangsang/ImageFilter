@@ -3,20 +3,16 @@ package com.example.nhatpham.camerafilter.preview
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.arch.lifecycle.Observer
-import android.content.Context
 import android.databinding.DataBindingUtil
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Parcelable
 import android.support.transition.Transition
 import android.support.transition.TransitionInflater
 import android.support.transition.TransitionListenerAdapter
 import android.support.v4.app.SharedElementCallback
 import android.support.v7.widget.LinearLayoutManager
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -30,17 +26,14 @@ import org.wysaid.view.ImageGLSurfaceView
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Toast
 import androidx.core.os.bundleOf
-import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import com.bumptech.glide.request.RequestOptions
 import com.example.nhatpham.camerafilter.*
+import com.example.nhatpham.camerafilter.custom.ViewLifecycleFragment
 import com.example.nhatpham.camerafilter.models.*
 import com.example.nhatpham.camerafilter.utils.*
-import org.jetbrains.anko.doAsync
-import org.jetbrains.anko.uiThread
 import org.wysaid.myUtils.ImageUtil
 import java.io.File
-import java.lang.System.exit
 
 
 internal class PhotoReviewFragment : ViewLifecycleFragment(), View.OnClickListener {
@@ -165,7 +158,9 @@ internal class PhotoReviewFragment : ViewLifecycleFragment(), View.OnClickListen
     }
 
     private fun updateCurrentImage() {
-        mBinding.imageView.setFilterWithConfig(currentConfig.value)
+        mBinding.imageView.post {
+            mBinding.imageView.setFilterWithConfig(currentConfig.value)
+        }
         mBinding.imageView.setImageBitmap(currentBitmap)
     }
 

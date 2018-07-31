@@ -44,35 +44,10 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
     protected CGEFrameRecorder mOriginFrameRecorder;
     protected CGEFrameRecorder mFrameRecorder;
     protected CameraReadyCallback mCameraReadyCallback;
-    private OrientationEventListener mOrientationEventListener;
     private int lastOrientation = Surface.ROTATION_0;
 
     public CameraGLSurfaceViewWithTexture(Context context, AttributeSet attrs) {
         super(context, attrs);
-        mOrientationEventListener = new OrientationEventListener(context) {
-            @Override
-            public void onOrientationChanged(int orientation) {
-                if (orientation < 0) {
-                    return; // Flip screen, Not take account
-                }
-                int curOrientation;
-
-                if (orientation <= 45) {
-                    curOrientation = Surface.ROTATION_0;
-                } else if (orientation <= 135) {
-                    curOrientation = Surface.ROTATION_90;
-                } else if (orientation <= 225) {
-                    curOrientation = Surface.ROTATION_180;
-                } else if (orientation <= 315) {
-                    curOrientation = Surface.ROTATION_270;
-                } else {
-                    curOrientation = Surface.ROTATION_0;
-                }
-                if (curOrientation != lastOrientation) {
-                    lastOrientation = curOrientation;
-                }
-            }
-        };
     }
 
     @Override
@@ -100,18 +75,10 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
         mSurfaceTexture.setOnFrameAvailableListener(this);
 
         super.onSurfaceCreated(gl, config);
-
-        if (mOrientationEventListener != null && mOrientationEventListener.canDetectOrientation()) {
-            mOrientationEventListener.enable();
-        }
     }
 
     protected void onRelease() {
         super.onRelease();
-        if (mOrientationEventListener != null) {
-            mOrientationEventListener.disable();
-        }
-
         if (mSurfaceTexture != null) {
             mSurfaceTexture.release();
             mSurfaceTexture = null;
@@ -418,17 +385,8 @@ public class CameraGLSurfaceViewWithTexture extends CameraGLSurfaceView implemen
 
                     if (cameraInstance().getFacing() == Camera.CameraInfo.CAMERA_FACING_BACK) {
                         Matrix mat = new Matrix();
-                        int degrees = Surface.ROTATION_0;
-                        if (lastOrientation == Surface.ROTATION_0) {
-                            degrees = 0;
-                        } else if (lastOrientation == Surface.ROTATION_90) {
-                            degrees = 90;
-                        } else if (lastOrientation == Surface.ROTATION_180) {
-                            degrees = 180;
-                        } else if (lastOrientation == Surface.ROTATION_270) {
-                            degrees = 270;
-                        }
-                        mat.setRotate(degrees, width/2, height/2);
+                        int halfLen = Math.min(width, height) / 2;
+                        mat.setRotate(90, halfLen, halfLen);
                         canvas.drawBitmap(bmp, mat, null);
                     } else {
                         Matrix mat = new Matrix();

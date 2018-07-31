@@ -1,4 +1,4 @@
-package com.example.nhatpham.camerafilter
+package com.example.nhatpham.camerafilter.custom
 
 /*
  *  Copyright 2017 Google Inc.

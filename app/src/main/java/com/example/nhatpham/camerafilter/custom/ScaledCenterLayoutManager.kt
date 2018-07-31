@@ -1,4 +1,4 @@
-package com.example.nhatpham.camerafilter
+package com.example.nhatpham.camerafilter.custom
 
 import android.content.Context
 import android.support.v7.widget.LinearLayoutManager
