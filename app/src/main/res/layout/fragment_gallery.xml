@@ -27,10 +27,11 @@
                 android:src="@drawable/back" />
 
             <TextView
+                android:id="@+id/tvGalleryTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:text="Gallery"
+                android:text="@string/gallery_title"
                 android:textColor="@android:color/white"
                 android:textSize="18sp" />
         </FrameLayout>

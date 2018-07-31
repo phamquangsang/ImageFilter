@@ -40,13 +40,12 @@ internal class GalleryFragment : Fragment() {
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_gallery, container, false)
-        initialize()
+        initUI()
         return mBinding.root
     }
 
-    private fun initialize() {
+    private fun initUI() {
         mainViewModel = getViewModel(activity!!)
-
         mBinding.rcImages.layoutManager = GridLayoutManager(context, 3, GridLayoutManager.VERTICAL, false)
         mBinding.rcImages.addItemDecoration(SpacesItemDecoration(resources.getDimensionPixelSize(R.dimen.gallery_space_item_size)))
 
@@ -67,10 +66,14 @@ internal class GalleryFragment : Fragment() {
             }
         })
         mBinding.rcImages.adapter = thumbnailsAdapter
+        mBinding.btnBack.clickWithDebounce { activity?.supportFragmentManager?.popBackStack() }
 
-        mBinding.btnBack.clickWithDebounce {
-            activity?.supportFragmentManager?.popBackStack()
+        val textResId = when (PREVIEW_TYPE) {
+            PreviewType.Photo -> R.string.gallery_photo_title
+            PreviewType.Video -> R.string.gallery_video_title
+            else -> R.string.gallery_title
         }
+        mBinding.tvGalleryTitle.setText(textResId)
 
         prepareExitTransitions()
         postponeEnterTransition()

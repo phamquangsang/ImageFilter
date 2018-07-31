@@ -1,6 +1,6 @@
 package com.example.nhatpham.camerafilter.camera
 
-sealed class CameraMode {
+internal sealed class CameraMode {
     object Photo : CameraMode() {
         override fun toString(): String {
             return "Photo"

@@ -120,32 +120,31 @@
             android:paddingBottom="4dp"
             android:visibility="@{cameraviewmodel.isRecording || AppConfigKt.PREVIEW_TYPE != PreviewType.Both ? View.INVISIBLE : View.VISIBLE}"
             app:layout_constraintEnd_toStartOf="@+id/btnPickFilters"
-            app:layout_constraintLeft_toRightOf="@+id/btnGallery"
+            app:layout_constraintLeft_toRightOf="@+id/imgGallery"
             app:layout_constraintRight_toLeftOf="@+id/btnPickFilters"
-            app:layout_constraintStart_toEndOf="@+id/btnGallery"
+            app:layout_constraintStart_toEndOf="@+id/imgGallery"
             app:layout_constraintTop_toBottomOf="@+id/cameraView"
             tools:visibility="gone" />
 
         <ImageView
-            android:id="@+id/btnGallery"
+            android:id="@+id/imgGallery"
             android:layout_width="56dp"
             android:layout_height="56dp"
             android:scaleType="centerInside"
             android:src="@drawable/gallery"
             android:visibility="@{cameraviewmodel.isRecording ? View.INVISIBLE : View.VISIBLE}"
-            app:layout_constraintBottom_toBottomOf="@+id/btnTakePhoto"
-            app:layout_constraintEnd_toStartOf="@+id/btnTakePhoto"
+            app:layout_constraintBottom_toBottomOf="@+id/fabAction"
+            app:layout_constraintEnd_toStartOf="@+id/fabAction"
             app:layout_constraintHorizontal_bias="0.35"
             app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toLeftOf="@+id/btnTakePhoto"
+            app:layout_constraintRight_toLeftOf="@+id/fabAction"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="@+id/btnTakePhoto" />
+            app:layout_constraintTop_toTopOf="@+id/fabAction" />
 
         <android.support.design.widget.FloatingActionButton
-            android:id="@+id/btnTakePhoto"
+            android:id="@+id/fabAction"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:src="@drawable/camera"
             app:backgroundTint="@android:color/white"
             app:fabSize="normal"
             app:layout_constraintEnd_toEndOf="parent"
@@ -154,19 +153,53 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/rcModes" />
 
-        <android.support.design.widget.FloatingActionButton
-            android:id="@+id/btnRecord"
+        <ImageView
+            android:id="@+id/imgCamera"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:elevation="6dp"
+            android:src="@drawable/camera"
+            app:elevation="6dp"
+            app:layout_constraintBottom_toBottomOf="@+id/fabAction"
+            app:layout_constraintEnd_toEndOf="@+id/fabAction"
+            app:layout_constraintLeft_toLeftOf="@+id/fabAction"
+            app:layout_constraintRight_toRightOf="@+id/fabAction"
+            app:layout_constraintStart_toStartOf="@+id/fabAction"
+            app:layout_constraintTop_toTopOf="@+id/fabAction" />
+
+
+        <ImageView
+            android:id="@+id/imgStartRecording"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:elevation="6dp"
             android:src="@drawable/start_record"
             android:visibility="gone"
-            app:backgroundTint="@android:color/white"
-            app:fabSize="normal"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/rcModes" />
+            app:elevation="6dp"
+            app:layout_constraintBottom_toBottomOf="@+id/fabAction"
+            app:layout_constraintEnd_toEndOf="@+id/fabAction"
+            app:layout_constraintLeft_toLeftOf="@+id/fabAction"
+            app:layout_constraintRight_toRightOf="@+id/fabAction"
+            app:layout_constraintStart_toStartOf="@+id/fabAction"
+            app:layout_constraintTop_toTopOf="@+id/fabAction" />
+
+        <ImageView
+            android:id="@+id/imgStopRecording"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:elevation="6dp"
+            android:src="@drawable/stop_recording"
+            android:visibility="gone"
+            app:elevation="6dp"
+            app:layout_constraintBottom_toBottomOf="@+id/fabAction"
+            app:layout_constraintEnd_toEndOf="@+id/fabAction"
+            app:layout_constraintLeft_toLeftOf="@+id/fabAction"
+            app:layout_constraintRight_toRightOf="@+id/fabAction"
+            app:layout_constraintStart_toStartOf="@+id/fabAction"
+            app:layout_constraintTop_toTopOf="@+id/fabAction" />
 
         <ImageView
             android:id="@+id/btnPickFilters"
@@ -175,12 +208,12 @@
             android:scaleType="centerInside"
             android:src="@drawable/filter_state"
             android:visibility="@{cameraviewmodel.isRecording ? View.INVISIBLE : View.VISIBLE}"
-            app:layout_constraintBottom_toBottomOf="@+id/btnTakePhoto"
+            app:layout_constraintBottom_toBottomOf="@+id/fabAction"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="0.65"
-            app:layout_constraintLeft_toRightOf="@+id/btnTakePhoto"
+            app:layout_constraintLeft_toRightOf="@+id/fabAction"
             app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintStart_toEndOf="@+id/btnTakePhoto"
-            app:layout_constraintTop_toTopOf="@+id/btnTakePhoto" />
+            app:layout_constraintStart_toEndOf="@+id/fabAction"
+            app:layout_constraintTop_toTopOf="@+id/fabAction" />
     </android.support.constraint.ConstraintLayout>
 </layout>

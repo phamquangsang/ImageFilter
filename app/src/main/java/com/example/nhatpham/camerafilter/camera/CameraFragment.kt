@@ -50,10 +50,11 @@ internal class CameraFragment : ViewLifecycleFragment(), View.OnClickListener {
     private val animShortDuration by lazy {
         resources.getInteger(android.R.integer.config_shortAnimTime).toLong()
     }
-    private val modes = ArrayList<CameraMode>().apply {
-        add(CameraMode.Photo)
-        add(CameraMode.Video)
-    }
+    private val currentMode : CameraMode
+    get() = cameraViewModel.currentModeLiveData.value ?: CameraMode.Photo
+
+    private val recordListener = RecordListener()
+    private var lastModeSelectedPos = 0
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         mBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_camera_filters, container, false)
@@ -76,12 +77,13 @@ internal class CameraFragment : ViewLifecycleFragment(), View.OnClickListener {
         snapHelper.attachToRecyclerView(mBinding.rcModes)
         modesAdapter = ModesAdapter(arrayListOf(CameraMode.Photo, CameraMode.Video), object : ModesAdapter.OnItemInteractListener {
             override fun onModeSelected(mode: CameraMode, position: Int) {
+                lastModeSelectedPos = position
                 cameraViewModel.currentModeLiveData.value = mode
                 mBinding.rcModes.smoothScrollToPosition(position)
             }
         })
         mBinding.rcModes.adapter = modesAdapter
-        mBinding.rcModes.smoothScrollToPosition(0)
+        mBinding.rcModes.scrollToPosition(lastModeSelectedPos)
         mBinding.rcModes.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             private var scrolled = false
 
@@ -109,10 +111,9 @@ internal class CameraFragment : ViewLifecycleFragment(), View.OnClickListener {
             }
         })
 
-        mBinding.btnRecord.clickWithDebounce(listener = RecordListener())
-        mBinding.btnTakePhoto.clickWithDebounce(listener = this)
+        mBinding.imgGallery.clickWithDebounce(listener = this)
+        mBinding.fabAction.clickWithDebounce(listener = this)
         mBinding.btnPickFilters.clickWithDebounce(300, listener = this)
-        mBinding.btnGallery.clickWithDebounce(listener = this)
         mBinding.btnBack.clickWithDebounce(listener = this)
         mBinding.btnSwitch.clickWithDebounce(listener = this)
 
@@ -164,12 +165,14 @@ internal class CameraFragment : ViewLifecycleFragment(), View.OnClickListener {
         })
 
         cameraViewModel.recordingStateLiveData.observe(viewLifecycleOwner!!, Observer {
-            val active = it == true
-            mBinding.btnRecord.setImageResource(if (active) R.drawable.stop_recording else R.drawable.start_record)
-            cameraViewModel.isRecording.set(active)
-            if (active)
-                showFilters(false)
-            else cameraViewModel.showFiltersEvent.value = cameraViewModel.showFiltersEvent.value
+            if(PREVIEW_TYPE == PreviewType.Both || PREVIEW_TYPE == PreviewType.Video) {
+                val active = it == true
+                updateRecordStateView(active)
+                cameraViewModel.isRecording.set(active)
+
+                if (active) showFilters(false)
+                else cameraViewModel.showFiltersEvent.value = cameraViewModel.showFiltersEvent.value
+            }
         })
 
         when (PREVIEW_TYPE) {
@@ -205,13 +208,45 @@ internal class CameraFragment : ViewLifecycleFragment(), View.OnClickListener {
     private fun updateModeView(newMode: CameraMode) {
         when (newMode) {
             CameraMode.Photo -> {
-                mBinding.btnTakePhoto.isVisible = true
-                mBinding.btnRecord.isVisible = false
+                mBinding.imgCamera.isVisible = true
+                mBinding.imgStartRecording.isVisible = false
             }
             CameraMode.Video -> {
-                mBinding.btnTakePhoto.isInvisible = true
-                mBinding.btnRecord.isVisible = true
+                mBinding.imgCamera.isVisible = false
+                mBinding.imgStartRecording.isVisible = true
             }
+        }
+    }
+
+    private fun updateRecordStateView(active: Boolean) {
+        if(active) {
+            mBinding.imgStartRecording.animate()
+                    .scaleX(0.35f)
+                    .scaleY(0.35f)
+                    .setDuration(animShortDuration)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationStart(animation: Animator?) {
+                            mBinding.imgStartRecording.animate().setListener(null)
+                            mBinding.imgStopRecording.post {
+                                mBinding.imgStopRecording.scaleX = 0.35f
+                                mBinding.imgStopRecording.scaleY = 0.35f
+                                mBinding.imgStopRecording.isVisible = true
+                            }
+                            mBinding.imgStopRecording.post {
+                                mBinding.imgStopRecording.animate()
+                                        .scaleX(1f)
+                                        .scaleY(1f)
+                                        .setDuration(animShortDuration)
+                                        .setInterpolator(AccelerateDecelerateInterpolator())
+                                        .start()
+                            }
+                        }
+                    })
+                    .start()
+        } else {
+            mBinding.imgStartRecording.isVisible = true
+            mBinding.imgStopRecording.isVisible = false
         }
     }
 
@@ -280,9 +315,12 @@ internal class CameraFragment : ViewLifecycleFragment(), View.OnClickListener {
     override fun onClick(v: View?) {
         when (v) {
             mBinding.btnPickFilters -> toggleFilters()
-            mBinding.btnTakePhoto -> context?.let { takePhoto(it) }
+            mBinding.fabAction -> {
+                if(currentMode == CameraMode.Photo) context?.let { takePhoto(it) }
+                else if(currentMode == CameraMode.Video) recordListener.onClick(v)
+            }
+            mBinding.imgGallery -> openGallery()
             mBinding.btnSwitch -> switchCamera()
-            mBinding.btnGallery -> openGallery()
             mBinding.btnBack -> exit()
         }
     }
