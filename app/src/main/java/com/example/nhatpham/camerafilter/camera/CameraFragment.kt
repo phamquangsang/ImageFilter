@@ -165,7 +165,7 @@ internal class CameraFragment : ViewLifecycleFragment(), View.OnClickListener {
         })
 
         cameraViewModel.recordingStateLiveData.observe(viewLifecycleOwner!!, Observer {
-            if(PREVIEW_TYPE == PreviewType.Both || PREVIEW_TYPE == PreviewType.Video) {
+            if(currentMode == PreviewType.Video) {
                 val active = it == true
                 updateRecordStateView(active)
                 cameraViewModel.isRecording.set(active)
